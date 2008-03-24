@@ -1,0 +1,27 @@
+syntax: glob
+.deps
+.libs
+Makefile
+Makefile.in
+*.la
+*.lo
+*.o
+aclocal.m4
+autom4te.cache
+config.guess
+config.h
+config.h.in
+config.log
+config.status
+config.sub
+configure
+depcomp
+install-sh
+libtool
+libusb-1.0.pc
+ltmain.sh
+missing
+stamp-h1
+libusb/compile
+libusb/examples/dpfp
+libusb/examples/lsusb
