@@ -1,0 +1,14 @@
+libusb
+======
+
+libusb is another library for USB device access from Linux userspace.
+It is written in C and licensed under the LGPL-2.1 (see COPYING).
+
+See the homepage for more information:
+http://libusb.sourceforge.net
+
+Use the mailing list for questions, comments, etc:
+https://sourceforge.net/mailarchive/forum.php?forum_name=libusb-devel
+
+- Daniel Drake <dsd@gentoo.org>
+
