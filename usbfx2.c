@@ -1,15 +1,18 @@
 #include <inttypes.h>
 
 
-struct usbfx2 {
-	libusb_device_handle *device;
-}
+/* private */
+struct cusbfx2_handle {
+	libusb_device_handle *usb_handle;
+};
+
 
 /**
+ * @param id
  * @return デバイスが見付かった場合はデバイスへのハンドル. それ以外では NULL.
  */
-libusb_device_handle *
-usbfx2_init(uint8 id)
+static libusb_device_handle *
+usbfx2_find_and_open(uint8_t id)
 {
 	libusb_device *found = NULL;
 	libusb_device **devices;
@@ -38,8 +41,8 @@ usbfx2_init(uint8 id)
 	}
 
 	if (found) {
-		libusb_device_ref(found);
 		handle = libusb_open(found);
+		libusb_claim_interface(handle, 0);
 	}
 
 	/* デバイスリストと見つかったデバイス以外の参照を解放する */
@@ -48,20 +51,20 @@ usbfx2_init(uint8 id)
 	return handle;
 }
 
+
 int
-usbfx2_load_firmware(libusb_device_handle *dev, uint8_t *firmware, uint8_t *string)
+usbfx2_load_firmware(libusb_device_handle *dev, uint8_t id, uint8_t *firmware, const char *firmware_id)
 {
 	/* TODO: libusb から String Descriptor にアクセスする手段が無いため、
 	   ファームウェアの判別ができない */
 
-	const uint8_t descriptor_pattern = { 0xB4, 0x04, 0x04, 0x10, 0x00, 0x00 };
+	static const uint8_t descriptor_pattern = { 0xB4, 0x04, 0x04, 0x10, 0x00, 0x00 };
 	uint16_t len, ofs;
 
 	/* 8051 を停止 */
 	uint8_t *stop_buf[1] = { 1 };
 	libusb_control_transfer(dev, LIBUSB_RECIPIENT_DEVICE|LIBUSB_REQUEST_TYPE_VENDOR|LIBUSB_ENDPOINT_OUT,
 							0xA0, 0xE600, 0x0000, stop_buf, 1, 1000);
-	setup[LIBUSB_CONTROL_SETUP_SIZE] = 1;
 
 	firmware += 8;
 
@@ -90,14 +93,104 @@ usbfx2_load_firmware(libusb_device_handle *dev, uint8_t *firmware, uint8_t *stri
 
 		if (len & 0x8000)
 			break;				/* 最終(リセット) */
-		fw += len + 4;
+
+		firmware += len + 4;
 	}
 
 	/* パッチを当てていた場合は元に戻す */
 	if (patch_ptr) {
 		patch_ptr[0] = patch_ptr[1] = 0x00;
 	}
-
-	/* 再起動後のファームウェアに接続 */
 }
 
+/* Exposed functions */
+
+/**
+ * Initialize cusbfx2.
+ *
+ * This function must be called before calling any other cusbfx2 functions.
+ *
+ * @return 0 on success, non-zero on error
+ */
+int
+CUSBFX2_init(void)
+{
+	return libusb_init();
+}
+
+
+/**
+ * Deinitialize cusbfx2.
+ *
+ * Should be called after closing all open devices and before your application terminates.
+ */
+void
+CUSBFX2_exit(void)
+{
+	libusb_exit();
+}
+
+
+/**
+ * ID が @a id である FX2 をオープンします。
+ *
+ * @a firmware が NULL であれば、ファームウェアのロードを行いません。
+ *
+ * @param id FX2のID
+ * @param firmware ファームウェア
+ * @param firmware_id ファームウェアのID
+ * @return handle
+ */
+CUSBFX2_Handle *
+CUSBFX2_open(uint8_t id, uint8_t *firmware, const char *firmware_id)
+{
+#define CUSBFX2_REOPEN_RETRY_MAX 400
+#define CUSBFX2_REOPEN_RETRY_WAIT 100
+	libusb_device_handle *dev;
+	cusbfx2_handle *handle = NULL;
+
+	dev = usbfx2_open(id);
+	if (!dev) {
+		return handle;
+	}
+
+	if (firmware) {
+		usbfx2_load_firmware(dev, id, firmware, firmware_id);
+
+		/* 再起動後のファームウェアに接続 */
+		libusb_close(dev);
+		libusb_device_unref(libusb_get_device(dev));
+
+		for (i = 0; i < CUSBFX2_REOPEN_RETRY_MAX; ++i) {
+			dev = usbfx2_open(id);
+			if (dev)
+				break;
+			usleep(CUSBFX2_REOPEN_RETRY_WAIT);
+		}
+	}
+
+	if (dev) {
+		handle = malloc(sizeof(*handle));
+		handle->usb_handle = dev;
+	}
+
+	return handle;
+}
+
+void
+CUSBFX2_close(cusbfx2_handle *h)
+{
+	assert(handle);
+
+	if (h->usb_handle) {
+		if (libusb_release_interface(h->usb_handle)) {
+			/* error */
+		}
+
+		if (libusb_close(h->usb_handle, 0)) {
+			/* error */
+		}
+	}
+
+	free(handle);
+}
