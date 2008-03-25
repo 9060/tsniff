@@ -83,9 +83,7 @@ enum {
 };
 
 enum {
-	IR_CMD_POWER_TOGGLE1	= 0x048A,
-	IR_CMD_POWER_TOGGLE2	= 0x050A,
-	IR_CMD_POWER_TOGGLE3	= 0x058A,
+	IR_CMD_POWER_TOGGLE		= 0x048A,
 	IR_CMD_POWER_ON			= 0x048B,
 	IR_CMD_POWER_OFF		= 0x048C,
 	IR_CMD_DISPLAY			= 0x048E,
@@ -136,6 +134,9 @@ capsts_exec_cmd(guint8 cmd, ...);
 
 void
 capsts_exec_cmd_queue(cusbfx2_handle *device);
+
+void
+capsts_set_ir_base(gint base);
 
 void
 capsts_ir_cmd_append(guint16 cmd);

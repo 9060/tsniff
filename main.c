@@ -1,3 +1,4 @@
+#include <string.h>
 #include <glib.h>
 #include "cusbfx2.h"
 #include "capsts.h"
@@ -11,11 +12,19 @@ static gchar *st_ts_filename = NULL;
 static gchar *st_bcas_filename = NULL;
 static gint st_buffer_length = 16384;
 static gint st_buffer_count = 16;
+static gint st_ir_base = 0;
+static gint st_source = -1;
+static gint st_channel = -1;
+static const gchar *st_long_channel = NULL;
 
 static GOptionEntry st_options[] = {
-	{ "fx2id", 'i', 0, G_OPTION_ARG_INT, &st_fx2id, "Set device id to ID (Default:0)", "ID" },
+	{ "fx2id", 'i', 0, G_OPTION_ARG_INT, &st_fx2id, "Set device id to ID [0]", "ID" },
 	{ "ts-filename", 't', 0, G_OPTION_ARG_FILENAME, &st_ts_filename, "Output MPEG2-TS to FILENAME", "FILENAME" },
 	{ "bcas-filename", 'b', 0, G_OPTION_ARG_FILENAME, &st_bcas_filename, "Output B-CAS stream to FILENAME", "FILENAME" },
+	{ "ir-base", 'I', 0, G_OPTION_ARG_INT, &st_ir_base, "Set IR base channel to N (1..3) [1]", "N" },
+	{ "source", 's', 0, G_OPTION_ARG_INT, &st_source, "Set tuner source to SOURCE (0:Digital 1:BS 2:CS)", "SOURCE" },
+	{ "channel", 'c', 0, G_OPTION_ARG_INT, &st_channel, "Set tuner channel to C (1..12)", "C" },
+	{ "long-channel", 'C', 0, G_OPTION_ARG_STRING, &st_long_channel, "Set tuner channel to CCC", "CCC" },
 	{ NULL }
 };
 
@@ -40,6 +49,49 @@ transfer_bcas_cb(gpointer data, gint length, gpointer user_data)
 }
 
 static void
+adjust_tuner_channel(cusbfx2_handle *device)
+{
+	switch (st_source) {
+	case 0:
+		capsts_ir_cmd_append(IR_CMD_DIGITAL_TERESTRIAL1);
+		break;
+	case 1:
+		capsts_ir_cmd_append(IR_CMD_FORMAT_BS);
+		break;
+	case 2:
+		capsts_ir_cmd_append(IR_CMD_FORMAT_CS);
+		break;
+	default:
+		break;
+	}
+
+	if (st_long_channel && st_source != 0) {
+		capsts_ir_cmd_append(IR_CMD_3DIGIT_INPUT);
+		if (strlen(st_long_channel) == 3) {
+			const gchar *p;
+			for (p = st_long_channel; p; ++p) {
+				gint digit = g_ascii_digit_value(*p);
+				if (digit < 0) {
+					digit = 0;
+				}
+				capsts_ir_cmd_append(IR_CMD_0 + digit);
+			}
+		}
+	} else {
+		if (st_channel >= 1 && st_channel <= 9) {
+			capsts_ir_cmd_append(IR_CMD_0 + st_channel);
+		} else if (st_channel == 10) {
+			capsts_ir_cmd_append(IR_CMD_0);
+		} else if (st_channel >= 11 && st_channel <= 12) {
+			capsts_ir_cmd_append(IR_CMD_11 + (st_channel - 11));
+		}
+	}
+
+	capsts_ir_cmd_send(device);
+	g_usleep(2500 * 1000);
+}
+
+static void
 rec(void)
 {
 	cusbfx2_handle *device = NULL;
@@ -48,6 +100,8 @@ rec(void)
 	GIOChannel *io_ts = NULL, *io_bcas = NULL;
 	GError *error = NULL;
 	GTimer *timer; 
+
+	capsts_set_ir_base(st_ir_base);
 
 	device = cusbfx2_open(st_fx2id, st_firmware, "FX2_FIFO");
 	if (!device) {
@@ -58,6 +112,8 @@ rec(void)
 	capsts_exec_cmd(CMD_MODE_IDLE);
 	capsts_exec_cmd(CMD_IFCONFIG, 0xE3);
 	capsts_exec_cmd_queue(device);
+
+	adjust_tuner_channel(device);
 
 	if (st_ts_filename) {
 		io_ts = g_io_channel_new_file(st_ts_filename, "w", &error);

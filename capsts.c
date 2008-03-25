@@ -4,8 +4,9 @@
 #include "capsts.h"
 
 static GByteArray *st_cmd_queue = NULL;
-static GArray *st_ir_cmd_queue = NULL;
 
+static GArray *st_ir_cmd_queue = NULL;
+static gint st_ir_base = 0;
 
 void
 capsts_exec_cmd(guint8 cmd, ...)
@@ -77,6 +78,12 @@ capsts_exec_cmd_queue(cusbfx2_handle *device)
 }
 
 void
+capsts_set_ir_base(gint base)
+{
+	st_ir_base = (CLAMP(base, 1, 3) - 1) * 0x80;
+}
+
+void
 capsts_ir_cmd_append(guint16 cmd)
 {
     if (!st_ir_cmd_queue) {
@@ -97,13 +104,14 @@ capsts_ir_cmd_send(cusbfx2_handle *device)
 	for (i = 0; i < st_ir_cmd_queue->len; ++i) {
 		guint16 cmd = g_array_index(st_ir_cmd_queue, guint16, i);
 
-		cmds[1] = cmd & 0xFF;
-		cmds[2] = (cmd >> 8) & 0xFF;
-		cusbfx2_bulk_transfer(device, ENDPOINT_CMD_OUT, cmds, 3);
-
 		if (cmd == IR_CMD_3DIGIT_INPUT) {
 			// wait == 300msec needed ?
 		}
+
+		cmds[1] = (cmd + st_ir_base) & 0xFF;
+		cmds[2] = ((cmd + st_ir_base) >> 8) & 0xFF;
+		cusbfx2_bulk_transfer(device, ENDPOINT_CMD_OUT, cmds, 3);
+
 		g_usleep(600 * 1000);
 
 		cmds[1] = cmds[2] = 0;
