@@ -1,29 +1,10 @@
 #include <glib.h>
 #include "cusbfx2.h"
+#include "capsts.h"
 
 static guint8 st_firmware[] =
 #include "fw.inc"
 
-#define CMD_EP6IN_START		0x50	//
-#define	CMD_EP6IN_STOP		0x51	//
-#define	CMD_EP2OUT_START	0x52	//
-#define	CMD_EP2OUT_STOP		0x53	//
-#define	CMD_PORT_CFG		0x54	//addr_mask, out_pins
-#define	CMD_REG_READ		0x55	//addr	(return 1byte)
-#define	CMD_REG_WRITE		0x56	//addr, value
-#define	CMD_PORT_READ		0x57	//(return 1byte)
-#define	CMD_PORT_WRITE		0x58	//value
-#define	CMD_IFCONFIG		0x59	//value
-#define	CMD_MODE_IDLE		0x5a
-#define CMD_EP4IN_START		0x5b	//
-#define	CMD_EP4IN_STOP		0x5c	//
-#define	CMD_IR_CODE			0x5d	//val_l, val_h (0x0000:RBUF capture 0xffff:BWUF output)
-#define CMD_IR_WBUF			0x5e	//ofs(0 or 64 or 128 or 192), len(max 64), data, ....
-#define	CMD_IR_RBUF			0x5f	//ofs(0 or 64 or 128 or 192) (return 64byte)
-#define	PIO_START	0x20
-#define	PIO_IR_OUT	0x10
-#define	PIO_IR_IN	0x08
-#define PIO_TS_BACK	0x04
 
 static gint st_fx2id = 0;
 static gchar *st_ts_filename = NULL;
@@ -73,6 +54,11 @@ rec(void)
 		return;
 	}
 
+	capsts_exec_cmd(CMD_PORT_CFG, 0x00, PIO_START|PIO_IR_OUT|PIO_TS_BACK);
+	capsts_exec_cmd(CMD_MODE_IDLE);
+	capsts_exec_cmd(CMD_IFCONFIG, 0xE3);
+	capsts_exec_cmd_queue(device);
+
 	if (st_ts_filename) {
 		io_ts = g_io_channel_new_file(st_ts_filename, "w", &error);
 		if (!io_ts) {
@@ -80,11 +66,13 @@ rec(void)
 		}
 		g_io_channel_set_encoding(io_ts, NULL, &error);
 
-		transfer_ts = cusbfx2_init_bulk_transfer(device, 0x86, st_buffer_length, st_buffer_count,
+		transfer_ts = cusbfx2_init_bulk_transfer(device, "MPEG-TS", ENDPOINT_TS_IN,
+												 st_buffer_length, st_buffer_count,
 												 transfer_ts_cb, io_ts);
 		if (!transfer_ts) {
 			goto quit;
 		}
+		capsts_exec_cmd(CMD_EP6IN_START);
 	}
 
 	if (st_bcas_filename) {
@@ -94,21 +82,16 @@ rec(void)
 		}
 		g_io_channel_set_encoding(io_bcas, NULL, &error);
 
-		transfer_bcas = cusbfx2_init_bulk_transfer(device, 0x84, 512, 1, transfer_bcas_cb, io_bcas);
+		transfer_bcas = cusbfx2_init_bulk_transfer(device, "B-CAS", ENDPOINT_BCAS_IN,
+												   512, 1, transfer_bcas_cb, io_bcas);
 		if (!transfer_bcas) {
 			goto quit;
 		}
+		capsts_exec_cmd(CMD_EP4IN_START);
 	}
 
-	{
-		guint8 cmd[] = { CMD_PORT_CFG, 0x00, PIO_START|PIO_IR_OUT|PIO_TS_BACK,
-						 CMD_MODE_IDLE, CMD_IFCONFIG, 0xE3 };
-		cusbfx2_bulk_transfer(device, 0x01, cmd, sizeof(cmd));
-	}
-	{
-		guint8 cmd[] = { CMD_EP6IN_START, CMD_EP4IN_START, CMD_PORT_WRITE, PIO_START|PIO_IR_OUT|PIO_TS_BACK };
-		cusbfx2_bulk_transfer(device, 0x01, cmd, sizeof(cmd));
-	}
+	capsts_exec_cmd(CMD_PORT_WRITE, PIO_START|PIO_IR_OUT|PIO_TS_BACK);
+	capsts_exec_cmd_queue(device);
 
 	timer = g_timer_new();
 	for (;;) {
@@ -119,23 +102,17 @@ rec(void)
 	}
 	g_timer_destroy(timer);
 
-	{
-		guint8 cmd[] = { CMD_EP6IN_STOP, CMD_EP4IN_STOP, CMD_MODE_IDLE };
-		cusbfx2_bulk_transfer(device, 0x01, cmd, sizeof(cmd));
-	}
+	capsts_exec_cmd(CMD_EP6IN_STOP);
+	if (st_bcas_filename) capsts_exec_cmd(CMD_EP4IN_STOP);
+	capsts_exec_cmd(CMD_MODE_IDLE);
+	capsts_exec_cmd_queue(device);
 
  quit:
-	if (transfer_ts) {
-		//cusbfx2_cancel_transfer_sync(transfer_ts);
-		cusbfx2_free_transfer(transfer_ts);
-	}
-	if (transfer_bcas) {
-		//cusbfx2_cancel_transfer_sync(transfer_bcas);
-		cusbfx2_free_transfer(transfer_bcas);
-	}
-	if (io_ts) g_io_channel_close(io_ts);
-	if (io_bcas) g_io_channel_close(io_bcas);
-	if (device) cusbfx2_close(device);
+	cusbfx2_free_transfer(transfer_ts);
+	cusbfx2_free_transfer(transfer_bcas);
+	g_io_channel_close(io_ts);
+	g_io_channel_close(io_bcas);
+	cusbfx2_close(device);
 }
 
 int

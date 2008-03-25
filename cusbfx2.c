@@ -14,6 +14,7 @@ struct cusbfx2_handle {
 };
 
 struct cusbfx2_transfer {
+	const gchar *name;
 	GSList *usb_transfers;
 	cusbfx2_transfer_cb_fn callback;
 	gpointer user_data;
@@ -223,7 +224,9 @@ cusbfx2_open(guint8 id, guint8 *firmware, const gchar *firmware_id)
 void
 cusbfx2_close(cusbfx2_handle *h)
 {
-	g_assert(h);
+	if (!h)
+		return;
+
 	g_assert(h->usb_handle);
 
 	if (h->usb_handle) {
@@ -261,8 +264,8 @@ cusbfx2_transfer_callback(struct libusb_transfer *usb_transfer)
 	switch (usb_transfer->status) {
 	case LIBUSB_TRANSFER_COMPLETED:
 		if (usb_transfer->actual_length != usb_transfer->length) {
-			g_warning("cusbfx2_transfer_callback: length mismatch req=%d, actual=%d",
-					  usb_transfer->length, usb_transfer->actual_length);
+			g_warning("cusbfx2_transfer_callback: [%s] length mismatch req=%d, actual=%d",
+					  transfer->name, usb_transfer->length, usb_transfer->actual_length);
 		}
 
 		if (transfer->callback) {
@@ -271,15 +274,15 @@ cusbfx2_transfer_callback(struct libusb_transfer *usb_transfer)
 		break;
 
 	case LIBUSB_TRANSFER_ERROR:
-		g_warning("cusbfx2_transfer_callback: TRANSFER_ERROR");
+		g_warning("cusbfx2_transfer_callback: [%s] TRANSFER_ERROR", transfer->name);
 		break;
 
 	case LIBUSB_TRANSFER_TIMED_OUT:
-		g_warning("cusbfx2_transfer_callback: TRANSFER_TIMED_OUT");
+		g_warning("cusbfx2_transfer_callback: [%s] TRANSFER_TIMED_OUT", transfer->name);
 		break;
 
 	case LIBUSB_TRANSFER_CANCELLED:
-		g_warning("cusbfx2_transfer_callback: TRANSFER_CANCELLED");
+		g_warning("cusbfx2_transfer_callback: [%s] TRANSFER_CANCELLED", transfer->name);
 		break;
 
 	default:
@@ -288,7 +291,7 @@ cusbfx2_transfer_callback(struct libusb_transfer *usb_transfer)
 
 	ret = libusb_submit_transfer(usb_transfer);
 	if (ret) {
-		g_critical("cusbfx2_transfer_callback: libusb_submit_transfer failed (%d)", ret);
+		g_critical("cusbfx2_transfer_callback: [%s] libusb_submit_transfer failed (%d)", transfer->name, ret);
 	}
 }
 
@@ -300,7 +303,8 @@ cusbfx2_transfer_callback(struct libusb_transfer *usb_transfer)
  * @param nqueues キュー数
  */
 cusbfx2_transfer *
-cusbfx2_init_bulk_transfer(cusbfx2_handle *h, guint8 endpoint, gint length, gint nqueues,
+cusbfx2_init_bulk_transfer(cusbfx2_handle *h, const gchar *name, guint8 endpoint,
+						   gint length, gint nqueues,
 						   cusbfx2_transfer_cb_fn callback, gpointer user_data)
 {
 	gint i;
@@ -313,9 +317,10 @@ cusbfx2_init_bulk_transfer(cusbfx2_handle *h, guint8 endpoint, gint length, gint
 	g_assert(callback);
 
 	transfer = g_malloc0(sizeof(*transfer));
+	transfer->name = name;
+	transfer->usb_transfers = NULL;
 	transfer->callback = callback;
 	transfer->user_data = user_data;
-	transfer->usb_transfers = NULL;
 
 	for (i = 0; i < nqueues; ++i) {
 		struct libusb_transfer *usb_transfer;
@@ -373,6 +378,10 @@ void
 cusbfx2_free_transfer(cusbfx2_transfer *transfer)
 {
 	GSList *p;
+
+	if (!transfer)
+		return;
+
 	for (p = transfer->usb_transfers; p; p = g_slist_next(p)) {
 		struct libusb_transfer *usb_transfer = (struct libusb_transfer *)p->data;
 		gint ret = libusb_cancel_transfer_sync(usb_transfer);
