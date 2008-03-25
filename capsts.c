@@ -4,6 +4,8 @@
 #include "capsts.h"
 
 static GByteArray *st_cmd_queue = NULL;
+static GArray *st_ir_cmd_queue = NULL;
+
 
 void
 capsts_exec_cmd(guint8 cmd, ...)
@@ -72,4 +74,44 @@ capsts_exec_cmd_queue(cusbfx2_handle *device)
 
 	g_byte_array_free(st_cmd_queue, TRUE);
 	st_cmd_queue = NULL;
+}
+
+void
+capsts_ir_cmd_append(guint16 cmd)
+{
+    if (!st_ir_cmd_queue) {
+		st_ir_cmd_queue = g_array_new(TRUE, TRUE, sizeof(guint16));
+    }
+
+	g_array_append_val(st_ir_cmd_queue, cmd);
+}
+
+void
+capsts_ir_cmd_send(cusbfx2_handle *device)
+{
+	guint i;
+	guint8 cmds[3] = { CMD_IR_CODE };
+
+	g_assert(st_ir_cmd_queue);
+
+	for (i = 0; i < st_ir_cmd_queue->len; ++i) {
+		guint16 cmd = g_array_index(st_ir_cmd_queue, guint16, i);
+
+		cmds[1] = cmd & 0xFF;
+		cmds[2] = (cmd >> 8) & 0xFF;
+		cusbfx2_bulk_transfer(device, ENDPOINT_CMD_OUT, cmds, 3);
+
+		if (cmd == IR_CMD_3DIGIT_INPUT) {
+			// wait == 300msec needed ?
+		}
+		g_usleep(600 * 1000);
+
+		cmds[1] = cmds[2] = 0;
+		cusbfx2_bulk_transfer(device, ENDPOINT_CMD_OUT, cmds, 3);
+
+		g_usleep(100 * 1000);
+	}
+
+	g_array_free(st_ir_cmd_queue, TRUE);
+	st_ir_cmd_queue = NULL;
 }
