@@ -1,6 +1,6 @@
-
-#include <inttypes.h>
+#include <string.h>
 #include <glib.h>
+#include <libusb.h>
 
 #include "cusbfx2.h"
 
@@ -31,7 +31,7 @@ cusbfx2_find_open(guint8 id)
 	gint ndevices;
 	gint i = 0;
 
-	ndevices = libusb_get_device_list(&list);
+	ndevices = libusb_get_device_list(&devices);
 	if (ndevices < 0) {
 		g_message("cusbfx2_find_open: no devices found (%d)", ndevices);
 		return NULL;
@@ -40,7 +40,7 @@ cusbfx2_find_open(guint8 id)
 
 	/* 接続されている全てのUSBデバイスを調べる */
 	for (i = 0; i < ndevices; ++i) {
-		libusb_device_descriptor *desc = libusb_get_device_descriptor(devices[i]);
+		struct libusb_device_descriptor *desc = libusb_get_device_descriptor(devices[i]);
 
 		g_debug("cusbfx2_find_open: devices[%d] idVendor=0x%04x, idProduct=0x%04x, bcdDevice=0x%04x",
 				i, desc->idVendor, desc->idProduct, desc->bcdDevice);
@@ -72,7 +72,7 @@ cusbfx2_find_open(guint8 id)
 	}
 
 	/* デバイスリストと見つかったデバイス以外の参照を解放する */
-	libusb_free_device_list(devices. 1);
+	libusb_free_device_list(devices, 1);
 
 	return handle;
 }
@@ -84,12 +84,12 @@ cusbfx2_load_firmware(libusb_device_handle *dev, guint8 id, guint8 *firmware, co
 	/* TODO: libusb から String Descriptor にアクセスする手段が無いため、
 	   ファームウェアの判別ができない */
 
-	static const guint8 descriptor_pattern = { 0xB4, 0x04, 0x04, 0x10, 0x00, 0x00 };
+	static const guint8 descriptor_pattern[] = { 0xB4, 0x04, 0x04, 0x10, 0x00, 0x00 };
 	guint8 *patch_ptr = NULL;
 	guint16 len, ofs;
 
 	/* 8051 を停止 */
-	guint8 *stop_buf[] = { 1 };
+	guint8 stop_buf[] = { 1 };
 	libusb_control_transfer(dev, LIBUSB_RECIPIENT_DEVICE|LIBUSB_REQUEST_TYPE_VENDOR|LIBUSB_ENDPOINT_OUT,
 							0xA0, 0xE600, 0x0000, stop_buf, 1, 1000);
 
@@ -97,6 +97,7 @@ cusbfx2_load_firmware(libusb_device_handle *dev, guint8 id, guint8 *firmware, co
 	firmware += 8;
 
 	for (;;) {
+		gint i;
 		len = (firmware[0] << 8) | firmware[1];
 		ofs = (firmware[2] << 8) | firmware[3];
 		firmware += 4;
@@ -105,7 +106,7 @@ cusbfx2_load_firmware(libusb_device_handle *dev, guint8 id, guint8 *firmware, co
 		   idに適合するBCD(FFxx)に書き換える */
 		for (i = 0; i < (len & 0x7FFF); ++i) {
 			guint8 *p = firmware + i;
-			if (!memcmp(p, descriptor_pattern, G_N_ELEMENTS(descriptor_pattern)) {
+			if (!memcmp(p, descriptor_pattern, G_N_ELEMENTS(descriptor_pattern))) {
 				/* パターンが見付かったので、BCDを書き換える */
 				patch_ptr = p + 4;
 				patch_ptr[0] = id;
@@ -127,6 +128,8 @@ cusbfx2_load_firmware(libusb_device_handle *dev, guint8 id, guint8 *firmware, co
 	if (patch_ptr) {
 		patch_ptr[0] = patch_ptr[1] = 0x00;
 	}
+
+	return TRUE;
 }
 
 /* Exposed functions */
@@ -184,8 +187,9 @@ cusbfx2_open(guint8 id, guint8 *firmware, const gchar *firmware_id)
 	}
 
 	if (firmware) {
+		gint i;
 		g_message("cusbfx2_open: loading firmware");
-		usbfx2_load_firmware(usb_handle, id, firmware, firmware_id);
+		cusbfx2_load_firmware(usb_handle, id, firmware, firmware_id);
 
 		/* 再起動後のファームウェアに接続 */
 		g_message("cusbfx2_open: reload device");
@@ -197,7 +201,7 @@ cusbfx2_open(guint8 id, guint8 *firmware, const gchar *firmware_id)
 		libusb_close(usb_handle);
 
 		for (i = 0; i < CUSBFX2_REOPEN_RETRY_MAX; ++i) {
-			usb_handle = usbfx2_find_open(id);
+			usb_handle = cusbfx2_find_open(id);
 			if (usb_handle)
 				break;
 			g_usleep(CUSBFX2_REOPEN_RETRY_WAIT);
@@ -230,12 +234,12 @@ cusbfx2_close(cusbfx2_handle *h)
 		libusb_close(h->usb_handle);
 	}
 
-	g_free(handle);
+	g_free(h);
 }
 
 
 gint
-cusbfx2_bulk_transfer(cusbfx2_handle *h, guint8 endpoint, const guint8 *data, gint length)
+cusbfx2_bulk_transfer(cusbfx2_handle *h, guint8 endpoint, guint8 *data, gint length)
 {
 	gint transferred;
 
@@ -246,7 +250,7 @@ cusbfx2_bulk_transfer(cusbfx2_handle *h, guint8 endpoint, const guint8 *data, gi
 
 
 static void
-cusbfx2_transfer_callback(libusb_transfer *usb_transfer)
+cusbfx2_transfer_callback(struct libusb_transfer *usb_transfer)
 {
 	cusbfx2_transfer *transfer = (cusbfx2_transfer *)usb_transfer->user_data;
 	gint ret;
@@ -312,7 +316,7 @@ cusbfx2_init_bulk_transfer(cusbfx2_handle *h, guint8 endpoint, gint length, gint
 	transfer->usb_transfers = NULL;
 
 	for (i = 0; i < nqueues; ++i) {
-		libusb_transfer *usb_transfer;
+		struct libusb_transfer *usb_transfer;
 		gpointer buffer;
 
 		usb_transfer = libusb_alloc_transfer();
@@ -327,6 +331,8 @@ cusbfx2_init_bulk_transfer(cusbfx2_handle *h, guint8 endpoint, gint length, gint
 		libusb_fill_bulk_transfer(usb_transfer, h->usb_handle, endpoint, buffer, length,
 								  cusbfx2_transfer_callback, transfer, CUSBFX2_TRANSFER_TIMEOUT);
 	}
+
+	return transfer;
 }
 
 void
@@ -334,7 +340,7 @@ cusbfx2_start_transfer(cusbfx2_transfer *transfer)
 {
 	GSList *p;
 	for (p = transfer->usb_transfers; p; p = g_slist_next(p)) {
-		libusb_transfer *usb_transfer = (libusb_transfer *)p->data;
+		struct libusb_transfer *usb_transfer = (struct libusb_transfer *)p->data;
 		gint ret = libusb_submit_transfer(usb_transfer);
 		if (ret) {
 			g_critical("cusbfx2_start_transfer: libusb_submit_transfer failed (%d)", ret);
@@ -347,7 +353,7 @@ cusbfx2_cancel_transfer_sync(cusbfx2_transfer *transfer)
 {
 	GSList *p;
 	for (p = transfer->usb_transfers; p; p = g_slist_next(p)) {
-		libusb_transfer *usb_transfer = (libusb_transfer *)p->data;
+		struct libusb_transfer *usb_transfer = (struct libusb_transfer *)p->data;
 		gint ret = libusb_cancel_transfer_sync(usb_transfer);
 		if (ret) {
 			g_warning("cusbfx2_cancel_transfer_sync: libusb_cancel_transfer_sync failed (%d)", ret);
@@ -360,7 +366,7 @@ cusbfx2_free_transfer(cusbfx2_transfer *transfer)
 {
 	GSList *p;
 	for (p = transfer->usb_transfers; p; p = g_slist_next(p)) {
-		libusb_transfer *usb_transfer = (libusb_transfer *)p->data;
+		struct libusb_transfer *usb_transfer = (struct libusb_transfer *)p->data;
 		g_free(usb_transfer->buffer);
 		libusb_free_transfer(usb_transfer);
 	}
@@ -381,5 +387,5 @@ cusbfx2_free_transfer(cusbfx2_transfer *transfer)
 int
 cusbfx2_poll(void)
 {
-	return libusb_pool();
+	return libusb_poll();
 }

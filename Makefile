@@ -1,11 +1,11 @@
 #!/usr/bin/make -f
 DIST     = .
 CC       = gcc
-CFLAGS   = -O2 -g -Wall -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 `pkg-config --cflags glib-2.0`
+CFLAGS   = -O2 -g -Wall -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 `pkg-config --cflags glib-2.0` -Ilibusb/libusb
 LDFLAGS  = 
 
 OBJS   = cusbfx2.o
-LIBS   = `pkg-config --libs glib-2.0`
+LIBS   = `pkg-config --libs glib-2.0` libusb/libusb/.libs/libusb-1.0.a -lrt
 TARGET = $(DIST)/recfx2
 
 all: $(TARGET) loadfx2fw
