@@ -7,7 +7,7 @@ typedef struct cusbfx2_handle cusbfx2_handle;
 struct cusbfx2_transfer;
 typedef struct cusbfx2_transfer cusbfx2_transfer;
 
-typedef void (*cusbfx2_transfer_cb_fn)(gpointer buf, gint length);
+typedef void (*cusbfx2_transfer_cb_fn)(gpointer buf, gint length, gpointer user_data);
 
 
 gint
@@ -22,7 +22,7 @@ gint
 cusbfx2_bulk_transfer(cusbfx2_handle *h, guint8 endpoint, guint8 *data, gint length);
 cusbfx2_transfer *
 cusbfx2_init_bulk_transfer(cusbfx2_handle *h, guint8 endpoint, gint length, gint nqueues,
-						   cusbfx2_transfer_cb_fn callback);
+						   cusbfx2_transfer_cb_fn callback, gpointer user_data);
 void
 cusbfx2_start_transfer(cusbfx2_transfer *transfer);
 void

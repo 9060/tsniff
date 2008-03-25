@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 DIST     = .
 CC       = gcc
-CFLAGS   = -O2 -g -Wall -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 `pkg-config --cflags glib-2.0` -Ilibusb/libusb
+CFLAGS   = -O2 -g -Wall -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 `pkg-config --cflags glib-2.0` -Ilibusb/libusb -DDEBUG
 LDFLAGS  = 
 
 OBJS   = cusbfx2.o main.o

@@ -16,6 +16,7 @@ struct cusbfx2_handle {
 struct cusbfx2_transfer {
 	GSList *usb_transfers;
 	cusbfx2_transfer_cb_fn callback;
+	gpointer user_data;
 };
 
 /**
@@ -27,6 +28,7 @@ cusbfx2_find_open(guint8 id)
 {
 	libusb_device *found = NULL;
 	libusb_device **devices;
+	libusb_device *device;
 	libusb_device_handle *handle = NULL;
 	gint ndevices;
 	gint i = 0;
@@ -36,14 +38,13 @@ cusbfx2_find_open(guint8 id)
 		g_message("cusbfx2_find_open: no devices found (%d)", ndevices);
 		return NULL;
 	}
-	g_debug("cusbfx2_find_open: ndevices=%d", ndevices);
 
 	/* 接続されている全てのUSBデバイスを調べる */
-	for (i = 0; i < ndevices; ++i) {
-		struct libusb_device_descriptor *desc = libusb_get_device_descriptor(devices[i]);
+	while ((device = devices[i++])) {
+		struct libusb_device_descriptor *desc = libusb_get_device_descriptor(device);
 
 		g_debug("cusbfx2_find_open: devices[%d] idVendor=0x%04x, idProduct=0x%04x, bcdDevice=0x%04x",
-				i, desc->idVendor, desc->idProduct, desc->bcdDevice);
+				i - 1, desc->idVendor, desc->idProduct, desc->bcdDevice);
 
 		/* bcdDevice = FX2LP:0xA0nn FX2:0x00nn */
 		if (((id == 0) && ((desc->bcdDevice & 0x0F00) == 0x0000)) ||
@@ -52,7 +53,7 @@ cusbfx2_find_open(guint8 id)
 				((desc->idProduct == 0x8613) || (desc->idProduct == 0x1004))) {
 				g_message("cusbfx2_find_open: found cusbfx2 idVendor=0x%04x, idProduct=0x%04x, bcdDevice=0x%04x",
 						  desc->idVendor, desc->idProduct, desc->bcdDevice);
-				found = devices[i];
+				found = device;
 				break;
 			}
 		}
@@ -173,8 +174,8 @@ cusbfx2_exit(void)
 cusbfx2_handle *
 cusbfx2_open(guint8 id, guint8 *firmware, const gchar *firmware_id)
 {
-#define CUSBFX2_REOPEN_RETRY_MAX 400
-#define CUSBFX2_REOPEN_RETRY_WAIT (100 * 1000)
+#define CUSBFX2_REOPEN_RETRY_MAX 10
+#define CUSBFX2_REOPEN_RETRY_WAIT (500 * 1000)
 
 	libusb_device_handle *usb_handle;
 	cusbfx2_handle *h = NULL;
@@ -265,7 +266,7 @@ cusbfx2_transfer_callback(struct libusb_transfer *usb_transfer)
 		}
 
 		if (transfer->callback) {
-			transfer->callback(usb_transfer->buffer, usb_transfer->actual_length);
+			transfer->callback(usb_transfer->buffer, usb_transfer->actual_length, transfer->user_data);
 		}
 		break;
 
@@ -300,7 +301,7 @@ cusbfx2_transfer_callback(struct libusb_transfer *usb_transfer)
  */
 cusbfx2_transfer *
 cusbfx2_init_bulk_transfer(cusbfx2_handle *h, guint8 endpoint, gint length, gint nqueues,
-						   cusbfx2_transfer_cb_fn callback)
+						   cusbfx2_transfer_cb_fn callback, gpointer user_data)
 {
 	gint i;
 	cusbfx2_transfer *transfer;
@@ -313,11 +314,13 @@ cusbfx2_init_bulk_transfer(cusbfx2_handle *h, guint8 endpoint, gint length, gint
 
 	transfer = g_malloc0(sizeof(*transfer));
 	transfer->callback = callback;
+	transfer->user_data = user_data;
 	transfer->usb_transfers = NULL;
 
 	for (i = 0; i < nqueues; ++i) {
 		struct libusb_transfer *usb_transfer;
 		gpointer buffer;
+		gint ret;
 
 		usb_transfer = libusb_alloc_transfer();
 		if (!usb_transfer) {
@@ -330,6 +333,11 @@ cusbfx2_init_bulk_transfer(cusbfx2_handle *h, guint8 endpoint, gint length, gint
 		buffer = g_malloc(length);
 		libusb_fill_bulk_transfer(usb_transfer, h->usb_handle, endpoint, buffer, length,
 								  cusbfx2_transfer_callback, transfer, CUSBFX2_TRANSFER_TIMEOUT);
+
+		ret = libusb_submit_transfer(usb_transfer);
+		if (ret) {
+			g_critical("cusbfx2_init_bulk_transfer: libusb_submit_transfer failed (%d)", ret);
+		}
 	}
 
 	return transfer;
@@ -367,6 +375,10 @@ cusbfx2_free_transfer(cusbfx2_transfer *transfer)
 	GSList *p;
 	for (p = transfer->usb_transfers; p; p = g_slist_next(p)) {
 		struct libusb_transfer *usb_transfer = (struct libusb_transfer *)p->data;
+		gint ret = libusb_cancel_transfer_sync(usb_transfer);
+		if (ret) {
+			g_warning("cusbfx2_cancel_transfer_sync: libusb_cancel_transfer_sync failed (%d)", ret);
+		}
 		g_free(usb_transfer->buffer);
 		libusb_free_transfer(usb_transfer);
 	}
