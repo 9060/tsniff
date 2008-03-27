@@ -302,16 +302,40 @@ static int get_init_status_b_cas_card(void *bcas, B_CAS_INIT_STATUS *stat)
 	return 0;
 }
 
+static gint
+compare_ecm_packet(gconstpointer plhs, gconstpointer prhs)
+{
+	const ECMPacket *lhs = (const ECMPacket *)plhs;
+	const ECMPacket *rhs = (const ECMPacket *)prhs;
+
+	if (lhs->len == rhs->len) {
+		return memcmp(lhs->data, rhs->data, lhs->len);
+	} else {
+		return rhs->len - lhs->len;
+	}
+}
+
 static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, int len)
 {
 	gpinter data;
-	data = g_async_queue_try_pop(st_bcas_queue);
-	if (data) {
-		
+	ECMpacket src_packet;
+	ECMPacket *ecm;
+
+	/* キューにストリームが届いている場合はECMキューを更新 */
+	while (data = g_async_queue_try_pop(st_bcas_queue)) {
+		bcas_stream_push((B_CAS_CARD_CHUNK *)data);
 	}
 
-	memcpy(dst->scramble_key, prv->rbuf+6, 16);
-	dst->return_code = 0x0200;
+	/* ECMキューからECMパケットを検索 */
+	src_packet.len = len;
+	g_memcpy(src_packet.data, src, len);
+	ecm = g_queue_find_custom(st_ecm_queue, &src_packet, compare_ecm_packet);
+
+	if (ecm) {
+		g_memcpy(dst->scramble_key, ecm->key, PACKET_KEY_SIZE);
+		dst->return_code = 0x0200;
+	} else {
+	}
 
 	return 0;
 }
