@@ -47,7 +47,7 @@ static gint st_ecm_queue_len = 128;
 			guint8 len = sizeof(payload);
 		}
 		payload {
-			guint32 commnad = 0x00150000; # Ì¤³ÎÇ§
+			guint32 commnad = 0x00150000; # æœªç¢ºèª
 			guint16 flag; # 0x0200 = Payment-deferred PPV / 0x0400 = Prepaid PPV / 0x0800 = Tier
 			guint8 KSo_odd[8];
 			guint8 KSo_even[8];
@@ -124,18 +124,18 @@ bcas_stream_sync(GByteArray *stream)
 	guint left_size, skip_size;
 	gboolean is_synced = FALSE;
 
-	/* ¥Ğ¥Ã¥Õ¥¡Ä¹¤¬ÀäÂĞ¤Ë¥Ñ¥±¥Ã¥È¤È¤·¤ÆÀ®Î©¤·¤Ê¤¤Ä¹¤µ¤À¤ÈÆ±´ü¤Ï¼è¤ì¤Ê¤¤ */
+	/* ãƒãƒƒãƒ•ã‚¡é•·ãŒçµ¶å¯¾ã«ãƒ‘ã‚±ãƒƒãƒˆã¨ã—ã¦æˆç«‹ã—ãªã„é•·ã•ã ã¨åŒæœŸã¯å–ã‚Œãªã„ */
 	if (stream->len < PACKET_MIN_SIZE) {
 		g_warning("bcas_stream_sync: not enough stream");
 		return FALSE;
 	}
 
-	/* ECM¥³¥Ş¥ó¥É¤¬¸½¤ï¤ì¤ë¾ì½ê¤òÃµ¤¹ */
+	/* ECMã‚³ãƒãƒ³ãƒ‰ãŒç¾ã‚ã‚Œã‚‹å ´æ‰€ã‚’æ¢ã™ */
 	left_size = stream->len - PACKET_HEADER_SIZE;
 	skip_size = PACKET_HEADER_SIZE;
 	for (p = stream->data + PACKET_HEADER_SIZE; left_size > 0; ++p, ++skip_size, --left_size) {
 		if (IS_ECM_REQUEST_PACKET(p - PACKET_HEADER_SIZE)) {
-			p -= PACKET_HEADER_SIZE; /* p ¤Ï¥Ñ¥±¥Ã¥ÈÀèÆ¬¤ò»Ø¤¹¤è¤¦¤Ë */
+			p -= PACKET_HEADER_SIZE; /* p ã¯ãƒ‘ã‚±ãƒƒãƒˆå…ˆé ­ã‚’æŒ‡ã™ã‚ˆã†ã« */
 			is_synced = TRUE;
 		}
 	}
@@ -143,12 +143,12 @@ bcas_stream_sync(GByteArray *stream)
 	if (is_synced) {
 		g_message("bcas_stream_sync: synced (skip %d bytes)", skip_size - PACKET_HEADER_SIZE);
 
-		/* ¥¹¥È¥ê¡¼¥àÀèÆ¬¤ÎÃæÅÓÈ¾Ã¼¤Ê¥Ñ¥±¥Ã¥È¤òºï¤ë */
+		/* ã‚¹ãƒˆãƒªãƒ¼ãƒ å…ˆé ­ã®ä¸­é€”åŠç«¯ãªãƒ‘ã‚±ãƒƒãƒˆã‚’å‰Šã‚‹ */
 		if (skip_size > PACKET_HEADER_SIZE) {
 			g_byte_array_remove_range(stream, 0, skip_size - PACKET_HEADER_SIZE);
 		}
 
-		/* ¥Ñ¥±¥Ã¥È¥µ¥¤¥ºÊ¬¤Î¥Ç¡¼¥¿¤¬»Ä¤Ã¤Æ¤¤¤Ê¤±¤ì¤Ğ¤Ş¤ÀÆ±´ü´°Î»¤Ë¤·¤Ê¤¤ */
+		/* ãƒ‘ã‚±ãƒƒãƒˆã‚µã‚¤ã‚ºåˆ†ã®ãƒ‡ãƒ¼ã‚¿ãŒæ®‹ã£ã¦ã„ãªã‘ã‚Œã°ã¾ã åŒæœŸå®Œäº†ã«ã—ãªã„ */
 		if (left_size < p[PACKET_LEN_INDEX] + 1/* header + payload + checksum */) {
 			g_warning("bcas_stream_sync: not enough stream (expect %d bytes but left %d bytes)",
 					  p[PACKET_LEN_INDEX] + 1, left_size);
@@ -176,7 +176,7 @@ bcas_stream_push(B_CAS_CARD_CHUNK *chunk)
 		gint i;
 		guint8 size, checksum, x = 0;
 
-		/* Æ±´ü¤ò¼è¤ë */
+		/* åŒæœŸã‚’å–ã‚‹ */
 		if (!is_synced) {
 			is_synced = bcas_stream_sync(st_stream);
 			if (!is_synced) {
@@ -188,7 +188,7 @@ bcas_stream_push(B_CAS_CARD_CHUNK *chunk)
 			parsed_size = 0;
 		}
 
-		/* 1¥Ñ¥±¥Ã¥ÈÊ¬¤Î¥Ç¡¼¥¿¤¬»Ä¤Ã¤Æ¤¤¤Ê¤±¤ì¤Ğ½ªÎ» */
+		/* 1ãƒ‘ã‚±ãƒƒãƒˆåˆ†ã®ãƒ‡ãƒ¼ã‚¿ãŒæ®‹ã£ã¦ã„ãªã‘ã‚Œã°çµ‚äº† */
 		if (left_size < PACKET_MIN_SIZE || left_size < p[PACKET_LEN_INDEX] + 1) {
 			g_warning("bcas_stream_push: not enough stream");
 			break;
@@ -197,19 +197,19 @@ bcas_stream_push(B_CAS_CARD_CHUNK *chunk)
 		size = p[PACKET_LEN_INDEX] + 1/* checksum */;
 		checksum = p[size - 1];
 
-		/* ¥Ñ¥±¥Ã¥È¤Î¥Á¥§¥Ã¥¯¥µ¥à¤ò·×»» */
+		/* ãƒ‘ã‚±ãƒƒãƒˆã®ãƒã‚§ãƒƒã‚¯ã‚µãƒ ã‚’è¨ˆç®— */
 		for (i = 0; i < p[PACKET_LEN_INDEX] + HEADER_SIZE; ++i)
 			x ^= p[i];
 
-		/* ¥Á¥§¥Ã¥¯¥µ¥à¤¬°ìÃ×¤·¤Ê¤±¤ì¤ĞºÆÆ±´ü */
+		/* ãƒã‚§ãƒƒã‚¯ã‚µãƒ ãŒä¸€è‡´ã—ãªã‘ã‚Œã°å†åŒæœŸ */
 		if (x != checksum) {
 			g_warning("bcas_stream_push: broken packet");
 
-			/* ²òÀÏºÑ¤ß¥Ñ¥±¥Ã¥È¤òºï¤ë(¸½¥Ñ¥±¥Ã¥È¤¬ECM¥³¥Ş¥ó¥É¤Ç¤¢¤ì¤Ğ¤½¤ì¤âºï¤ë) */
+			/* è§£ææ¸ˆã¿ãƒ‘ã‚±ãƒƒãƒˆã‚’å‰Šã‚‹(ç¾ãƒ‘ã‚±ãƒƒãƒˆãŒECMã‚³ãƒãƒ³ãƒ‰ã§ã‚ã‚Œã°ãã‚Œã‚‚å‰Šã‚‹) */
 			g_byte_array_remove_range(st_stream, 0,
 									  parsed_size + (IS_ECM_COMMAND(command) ? PACKET_COMMAND_INDEX + 4 : 0));
 
-			/* ECM Response ¥Ñ¥±¥Ã¥ÈÂÔ¤Á¤Ç¤¢¤ì¤ĞÇË´ş¤¹¤ë */
+			/* ECM Response ãƒ‘ã‚±ãƒƒãƒˆå¾…ã¡ã§ã‚ã‚Œã°ç ´æ£„ã™ã‚‹ */
 			if (ecm_packet) {
 				g_warning("bcas_stream_push: dispose pending ECM request packet");
 				g_slice_free(ecm_packet, ECMPacket);
@@ -219,12 +219,12 @@ bcas_stream_push(B_CAS_CARD_CHUNK *chunk)
 			continue;
 		}
 
-		/* ¤³¤³¤Ş¤Ç¤¯¤ì¤Ğ¡¢¥Ñ¥±¥Ã¥È¤È¤·¤Æ¤ÏÀµ¤·¤¤ */
+		/* ã“ã“ã¾ã§ãã‚Œã°ã€ãƒ‘ã‚±ãƒƒãƒˆã¨ã—ã¦ã¯æ­£ã—ã„ */
 		++response_delay;
 
 		if (IS_ECM_REQUEST_PACKET(p)) {
-			/* ECM Request ¥Ñ¥±¥Ã¥È¤Ç¤¢¤ì¤ĞÂĞ±ş¤¹¤ë ECM Response ¤òÂÔ¤Ä */
-			/* ´û¤Ë Response ¤òÂÔ¤Ã¤Æ¤¤¤ë? */
+			/* ECM Request ãƒ‘ã‚±ãƒƒãƒˆã§ã‚ã‚Œã°å¯¾å¿œã™ã‚‹ ECM Response ã‚’å¾…ã¤ */
+			/* æ—¢ã« Response ã‚’å¾…ã£ã¦ã„ã‚‹? */
 			if (ecm_packet) {
 				g_warning("bcas_stream_push: found a new ECM request before completing old request (delta %d packets)",
 						  response_delay - 1);
@@ -236,7 +236,7 @@ bcas_stream_push(B_CAS_CARD_CHUNK *chunk)
 
 			response_delay = 0;
 		} else if (IS_ECM_RESPONSE_PACKET(p)) {
-			/* Request ¤¬¤Ê¤¤¤Î¤Ë Response ¤¬Íè¤¿ */
+			/* Request ãŒãªã„ã®ã« Response ãŒæ¥ãŸ */
 			if (!ecm_packet) {
 				g_warning("bcas_stream_push: not requested ECM response found");
 			} else {
@@ -247,10 +247,10 @@ bcas_stream_push(B_CAS_CARD_CHUNK *chunk)
 				ecm_packet->flag = (p[PACKET_FLAG_INDEX] << 8) | p[PACKET_FLAG_INDEX + 1];
 				g_memcpy(ecm_packet->key, &p[PACKET_KEY_INDEX], PACKET_KEY_SIZE);
 
-				/* ECM¥­¥å¡¼¤ËÄÉ²Ã */
+				/* ECMã‚­ãƒ¥ãƒ¼ã«è¿½åŠ  */
 				g_queue_push_tail(st_ecm_queue, ecm_packet);
 				if (g_gueue_get_length(st_ecm_queue) > st_ecm_queue_len) {
-					/* ECM¥­¥å¡¼¤ÎºÇÂçÄ¹¤ò±Û¤¨¤Æ¤¤¤¿¤é¡¢ºÇ¤â¸Å¤¤ ECM ¤ò¼Î¤Æ¤ë */
+					/* ECMã‚­ãƒ¥ãƒ¼ã®æœ€å¤§é•·ã‚’è¶Šãˆã¦ã„ãŸã‚‰ã€æœ€ã‚‚å¤ã„ ECM ã‚’æ¨ã¦ã‚‹ */
 					g_slice_free(ECMPacket, g_queue_pop_head(st_ecm_queue));
 				}
 
@@ -321,12 +321,12 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 	ECMpacket src_packet;
 	ECMPacket *ecm;
 
-	/* ¥­¥å¡¼¤Ë¥¹¥È¥ê¡¼¥à¤¬ÆÏ¤¤¤Æ¤¤¤ë¾ì¹ç¤ÏECM¥­¥å¡¼¤ò¹¹¿· */
+	/* ã‚­ãƒ¥ãƒ¼ã«ã‚¹ãƒˆãƒªãƒ¼ãƒ ãŒå±Šã„ã¦ã„ã‚‹å ´åˆã¯ECMã‚­ãƒ¥ãƒ¼ã‚’æ›´æ–° */
 	while (data = g_async_queue_try_pop(st_bcas_queue)) {
 		bcas_stream_push((B_CAS_CARD_CHUNK *)data);
 	}
 
-	/* ECM¥­¥å¡¼¤«¤éECM¥Ñ¥±¥Ã¥È¤ò¸¡º÷ */
+	/* ECMã‚­ãƒ¥ãƒ¼ã‹ã‚‰ECMãƒ‘ã‚±ãƒƒãƒˆã‚’æ¤œç´¢ */
 	src_packet.len = len;
 	g_memcpy(src_packet.data, src, len);
 	ecm = g_queue_find_custom(st_ecm_queue, &src_packet, compare_ecm_packet);
