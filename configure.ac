@@ -16,10 +16,18 @@ AC_PROG_LIBTOOL
 AC_CHECK_LIB([rt], [clock_gettime])
 
 AC_CHECK_LIB([b25], [arib_std_b25_init])
+B25_CFLAGS=-I/usr/local/include/arib_std_b25
+B25_LIBS="-L/usr/local/lib -lb25"
+AC_SUBST(B25_CFLAGS)
+AC_SUBST(B25_LIBS)
 
 PKG_CHECK_MODULES(GLIB, glib-2.0 >= 2.14)
 AC_SUBST(GLIB_CFLAGS)
 AC_SUBST(GLIB_LIBS)
+
+PKG_CHECK_MODULES(PCSCLITE, libpcsclite)
+AC_SUBST(PCSCLITE_CFLAGS)
+AC_SUBST(PCSCLITE_LIBS)
 
 # Checks for header files.
 AC_HEADER_STDC

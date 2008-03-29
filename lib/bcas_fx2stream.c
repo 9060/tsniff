@@ -1,6 +1,6 @@
 #include "b_cas_card.h"
 #include "b_cas_card_error_code.h"
-#include "b_cas_card_fx2stream.h"
+#include "bcas_fx2stream.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -104,17 +104,17 @@ static gint st_ecm_queue_len = 128;
 #define PACKET_KEY_INDEX 6
 #define PACKET_KEY_SIZE (8 + 8)	/* KSo_odd + KSo_even */
 
-#define IS_ECM_REQUEST_PACKET(p) (p[3] == 0x90 && p[4] == 0x34 && p[5] == 0x00 && p[6] == 0x00)
-#define IS_ECM_RESPONSE_PACKET(p) (p[0] == 0x00 && p[1] == 0x40 && p[2] == 0x19)
+#define IS_ECM_REQUEST_PACKET(p) ((p)[3] == 0x90 && (p)[4] == 0x34 && (p)[5] == 0x00 && (p)[6] == 0x00)
+#define IS_ECM_RESPONSE_PACKET(p) ((p)[0] == 0x00 && (p)[1] == 0x40 && (p)[2] == 0x19)
 
-typedef struct {
+typedef struct ECMPacket {
 	/* Requested packet */
-	uint8 len;
-	uint8 data[G_UINT8_MAX];
+	guint8 len;
+	guint8 data[G_MAXUINT8];
 
 	/* Responed packet */
-	uint16 flag;
-	uint8 key[PACKET_KEY_SIZE];
+	guint16 flag;
+	guint8 key[PACKET_KEY_SIZE];
 } ECMPacket;
 
 static gboolean
@@ -160,7 +160,7 @@ bcas_stream_sync(GByteArray *stream)
 }
 
 static void
-bcas_stream_push(B_CAS_CARD_CHUNK *chunk)
+bcas_stream_push(void *data, uint len)
 {
 	static gboolean is_synced = FALSE;
 	static ECMPacket *ecm_packet = NULL;
@@ -170,7 +170,7 @@ bcas_stream_push(B_CAS_CARD_CHUNK *chunk)
 	guint left_size = st_stream->len;
 	guint parsed_size = 0;
 
-	g_byte_array_append(st_stream, chunk->data, chunk->len);
+	g_byte_array_append(st_stream, data, len);
 
 	for (;;) {
 		gint i;
@@ -198,7 +198,7 @@ bcas_stream_push(B_CAS_CARD_CHUNK *chunk)
 		checksum = p[size - 1];
 
 		/* パケットのチェックサムを計算 */
-		for (i = 0; i < p[PACKET_LEN_INDEX] + HEADER_SIZE; ++i)
+		for (i = 0; i < p[PACKET_LEN_INDEX] + PACKET_HEADER_SIZE; ++i)
 			x ^= p[i];
 
 		/* チェックサムが一致しなければ再同期 */
@@ -207,12 +207,12 @@ bcas_stream_push(B_CAS_CARD_CHUNK *chunk)
 
 			/* 解析済みパケットを削る(現パケットがECMコマンドであればそれも削る) */
 			g_byte_array_remove_range(st_stream, 0,
-									  parsed_size + (IS_ECM_COMMAND(command) ? PACKET_COMMAND_INDEX + 4 : 0));
+									  parsed_size + (IS_ECM_COMMAND(p) ? PACKET_COMMAND_INDEX + 4 : 0));
 
 			/* ECM Response パケット待ちであれば破棄する */
 			if (ecm_packet) {
 				g_warning("bcas_stream_push: dispose pending ECM request packet");
-				g_slice_free(ecm_packet, ECMPacket);
+				g_slice_free(ECMPacket, ecm_packet);
 				ecm_packet = NULL;
 			}
 			is_synced = FALSE;
@@ -269,17 +269,6 @@ bcas_stream_push(B_CAS_CARD_CHUNK *chunk)
  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 static int init_b_cas_card(void *bcas)
 {
-	int m;
-	LONG ret;
-	DWORD len;
-	
-	B_CAS_CARD_PRIVATE_DATA *prv;
-
-	prv = private_data(bcas);
-	if(prv == NULL){
-		return B_CAS_CARD_ERROR_INVALID_PARAMETER;
-	}
-
 	st_ecm_queue = g_queue_new();
 
 	return 0;
@@ -288,7 +277,7 @@ static int init_b_cas_card(void *bcas)
 static void release_b_cas_card(void *bcas)
 {
 	gpointer ecm;
-	while (ecm = g_queue_pop_head()) {
+	while (ecm = g_queue_pop_head(st_ecm_queue)) {
 		g_free(ecm);
 	}
 	g_free(st_ecm_queue);
@@ -317,14 +306,9 @@ compare_ecm_packet(gconstpointer plhs, gconstpointer prhs)
 
 static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, int len)
 {
-	gpinter data;
-	ECMpacket src_packet;
+	gpointer data;
+	ECMPacket src_packet;
 	ECMPacket *ecm;
-
-	/* キューにストリームが届いている場合はECMキューを更新 */
-	while (data = g_async_queue_try_pop(st_bcas_queue)) {
-		bcas_stream_push((B_CAS_CARD_CHUNK *)data);
-	}
 
 	/* ECMキューからECMパケットを検索 */
 	src_packet.len = len;
