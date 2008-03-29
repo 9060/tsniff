@@ -1,0 +1,8 @@
+INSTALL
+=======
+
+ libusb-1.0 0499e9f418607b5786ac0c3e97bc46737a609ca3
+
+1. 最新版の snapshot を入手します
+
+ $ wget "http://projects.reactivated.net/cgi-bin/gitweb.cgi?p=libusb.git;a=snapshot;h=0499e9f418607b5786ac0c3e97bc46737a609ca3;sf=tgz"
