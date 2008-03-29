@@ -3,8 +3,8 @@ noinst_LTLIBRARIES = libcapsts.la
 libcapsts_la_SOURCES = \
 	bcas_stream.c \
 	bcas_stream.h \
-	bcas_fx2stream.c \
-	bcas_fx2stream.h \
+	bcas_card_streaming.c \
+	bcas_card_streaming.h \
 	capsts.c \
 	capsts.h \
 	cusbfx2.c \

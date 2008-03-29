@@ -27,17 +27,25 @@ typedef struct BCASStream BCASStream;
 #define BCAS_IS_ECM_RESPONSE_PACKET(p)				\
 	(((p)->header == 0x0040) && ((p)->len == 0x18))
 
+#define BCAS_ECM_PACKET_FLAGS_INDEX 4
+#define BCAS_ECM_PACKET_KEY_INDEX 6
+#define BCAS_ECM_PACKET_KEY_SIZE 16
 
-typedef void (*BCASStreamCallbackFunc)(const BCASPacket *packet);
+/**
+ * @param packet
+ * @param is_first_sync	同期後、最初に現われたパケットであれば TRUE
+ * @param user_data
+ */
+typedef void (*BCASStreamCallbackFunc)(const BCASPacket *packet, gboolean is_first_sync, gpointer user_data);
 
 
 BCASStream *
-bcas_stream_init(void);
+bcas_stream_new(void);
 
 void
 bcas_stream_free(BCASStream *self);
 
 void
-bcas_stream_push(BCASStream *self, guint8 *data, uint len, BCASStreamCallbackFunc *cbfn);
+bcas_stream_push(BCASStream *self, guint8 *data, uint len, BCASStreamCallbackFunc cbfn, gpointer user_data);
 
 #endif	/* BCAS_STREAM_H_INCLUDED */

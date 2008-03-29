@@ -1,11 +1,15 @@
 #ifndef B_CAS_CARD_FX2STREAM_H
 #define B_CAS_CARD_FX2STREAM_H
 
-#include "portable.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+B_CAS_CARD *
+bcas_card_streaming_new(void);
+
+void
+bcas_card_streaming_push(B_CAS_CARD *, guint8 *data, guint len);
 
 #ifdef __cplusplus
 }

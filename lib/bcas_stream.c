@@ -7,6 +7,7 @@
 struct BCASStream {
 	GByteArray *raw_stream;		/* 未解析のバイトストリーム */
 	gboolean is_synced;			/* ストリームの同期が取れているか? */
+	guint n_sync_packets;		/*  */
 };
 
 
@@ -65,7 +66,7 @@ bcas_stream_sync(GByteArray *raw_stream)
 }
 
 static void
-bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc *cbfn)
+bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_data)
 {
 	BCASPacket packet;
 
@@ -84,6 +85,8 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc *cbfn)
 				g_warning("bcas_stream_parse: couldn't sync stream");
 				break;
 			}
+
+			self->n_sync_packets = 0;
 			p = self->raw_stream->data;
 			left_size = self->raw_stream->len;
 			parsed_size = 0;
@@ -115,10 +118,12 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc *cbfn)
 		}
 
 		/* ここまでくれば、パケットとしては正しいので、コールバック関数を呼ぶ */
+		++self->n_sync_packets;
+
 		packet.header = (p[0] << 8) || p[1];
 		packet.len = p[PACKET_DATA_LEN_INDEX];
 		memcpy(packet.payload, &p[PACKET_DATA_INDEX], packet.len);
-		(*cbfn)(&packet);
+		(*cbfn)(&packet, self->n_sync_packets == 1, user_data);
 
 		p += size;
 		parsed_size += size;
@@ -128,13 +133,14 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc *cbfn)
 
 /* -------------------------------------------------------------------------- */
 BCASStream *
-bcas_stream_init(void)
+bcas_stream_new(void)
 {
 	BCASStream *self;
 
 	self = g_new(BCASStream, 1);
 	self->raw_stream = g_byte_array_new();
 	self->is_synced = FALSE;
+	self->n_sync_packets = 0;
 
 	return self;
 }
@@ -149,10 +155,10 @@ bcas_stream_free(BCASStream *self)
 }
 
 void
-bcas_stream_push(BCASStream *self, guint8 *data, uint len, BCASStreamCallbackFunc *cbfn)
+bcas_stream_push(BCASStream *self, guint8 *data, uint len, BCASStreamCallbackFunc cbfn, gpointer user_data)
 {
 	g_byte_array_append(self->raw_stream, data, len);
-	bcas_stream_parse(self, cbfn);
+	bcas_stream_parse(self, cbfn, user_data);
 }
 
 
