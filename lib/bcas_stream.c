@@ -22,40 +22,45 @@ struct BCASStream {
 #define PACKET_KEY_INDEX 6
 #define PACKET_KEY_SIZE (8 + 8)	/* KSo_odd + KSo_even */
 
+#define IS_ECM_REQUEST(p)						\
+	(((p)[PACKET_COMMAND_INDEX] == 0x90) &&		\
+	 ((p)[PACKET_COMMAND_INDEX + 1] == 0x34) &&	\
+	 ((p)[PACKET_COMMAND_INDEX + 2] == 0x00) &&	\
+	 ((p)[PACKET_COMMAND_INDEX + 3] == 0x00))
 
 static gboolean
-bcas_stream_sync(GByteArray *raw_stream)
+bcas_stream_sync(BCASStream *self)
 {
 	guint8 *p;
 	guint left_size, skip_size;
 	gboolean is_synced = FALSE;
 
 	/* バッファ長が絶対にパケットとして成立しない長さだと同期は取れない */
-	if (raw_stream->len < PACKET_MIN_SIZE) {
+	if (self->raw_stream->len < PACKET_MIN_SIZE) {
 		g_warning("bcas_stream_sync: not enough stream");
 		return FALSE;
 	}
 
 	/* ECMコマンドが現われる場所を探す */
-	left_size = raw_stream->len - PACKET_HEADER_SIZE;
-	skip_size = PACKET_HEADER_SIZE;
-	for (p = raw_stream->data + PACKET_HEADER_SIZE; left_size > 0; ++p, ++skip_size, --left_size) {
-		if (IS_ECM_REQUEST_PACKET(p - PACKET_HEADER_SIZE)) {
-			p -= PACKET_HEADER_SIZE; /* p はパケット先頭を指すように */
+	left_size = self->raw_stream->len - PACKET_HEADER_SIZE + 4;
+	skip_size = 0;
+	for (p = self->raw_stream->data; left_size > 0; ++p, ++skip_size, --left_size) {
+		if (IS_ECM_REQUEST(p)) {
 			is_synced = TRUE;
+			break;
 		}
 	}
 
 	if (is_synced) {
-		g_message("bcas_stream_sync: synced (skip %d bytes)", skip_size - PACKET_HEADER_SIZE);
+		g_message("bcas_stream_sync: synced (skip %d bytes)", skip_size);
 
 		/* ストリーム先頭の中途半端なパケットを削る */
-		if (skip_size > PACKET_HEADER_SIZE) {
-			g_byte_array_remove_range(raw_stream, 0, skip_size - PACKET_HEADER_SIZE);
+		if (skip_size > 0) {
+			self->raw_stream = g_byte_array_remove_range(self->raw_stream, 0, skip_size);
 		}
 
 		/* パケットサイズ分のデータが残っていなければまだ同期完了にしない */
-		if (left_size < p[PACKET_LEN_INDEX] + 1/* header + payload + checksum */) {
+		if (left_size < PACKET_HEADER_SIZE + p[PACKET_LEN_INDEX] + 1/* header + payload + checksum */) {
 			g_warning("bcas_stream_sync: not enough stream (expect %d bytes but left %d bytes)",
 					  p[PACKET_LEN_INDEX] + 1, left_size);
 			is_synced = FALSE;
@@ -80,7 +85,7 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 
 		/* 同期を取る */
 		if (!self->is_synced) {
-			self->is_synced = bcas_stream_sync(self->raw_stream);
+			self->is_synced = bcas_stream_sync(self);
 			if (!self->is_synced) {
 				g_warning("bcas_stream_parse: couldn't sync stream");
 				break;
@@ -94,15 +99,15 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 
 		/* 1パケット分のデータが残っていなければ終了 */
 		if (left_size < PACKET_MIN_SIZE || left_size < p[PACKET_LEN_INDEX] + 1) {
-			g_warning("bcas_stream_parse: not enough stream");
+			//g_warning("bcas_stream_parse: not enough stream");
 			break;
 		}
 
-		size = p[PACKET_LEN_INDEX] + 1/* checksum */;
+		size = PACKET_HEADER_SIZE + p[PACKET_LEN_INDEX] + 1/* checksum */;
 		checksum = p[size - 1];
 
 		/* パケットのチェックサムを計算 */
-		for (i = 0; i < p[PACKET_LEN_INDEX] + PACKET_HEADER_SIZE; ++i)
+		for (i = 0; i < PACKET_HEADER_SIZE + p[PACKET_LEN_INDEX]; ++i)
 			x ^= p[i];
 
 		/* チェックサムが一致しなければ再同期 */
@@ -110,8 +115,8 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 			g_warning("bcas_stream_prase: broken packet");
 
 			/* 解析済みパケットを削る(現パケットがECMコマンドであればそれも削る) */
-			g_byte_array_remove_range(self->raw_stream, 0,
-									  parsed_size + (IS_ECM_COMMAND(p) ? PACKET_COMMAND_INDEX + 4 : 0));
+			self->raw_stream = g_byte_array_remove_range(self->raw_stream, 0,
+														 parsed_size + (IS_ECM_REQUEST(p) ? PACKET_COMMAND_INDEX + 4 : 0));
 
 			self->is_synced = FALSE;
 			continue;
@@ -120,9 +125,9 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 		/* ここまでくれば、パケットとしては正しいので、コールバック関数を呼ぶ */
 		++self->n_sync_packets;
 
-		packet.header = (p[0] << 8) || p[1];
-		packet.len = p[PACKET_DATA_LEN_INDEX];
-		memcpy(packet.payload, &p[PACKET_DATA_INDEX], packet.len);
+		packet.header = (p[0] << 8) | p[1];
+		packet.len = p[2];
+		memcpy(packet.payload, &p[3], packet.len);
 		(*cbfn)(&packet, self->n_sync_packets == 1, user_data);
 
 		p += size;
@@ -157,7 +162,7 @@ bcas_stream_free(BCASStream *self)
 void
 bcas_stream_push(BCASStream *self, guint8 *data, uint len, BCASStreamCallbackFunc cbfn, gpointer user_data)
 {
-	g_byte_array_append(self->raw_stream, data, len);
+	self->raw_stream = g_byte_array_append(self->raw_stream, data, len);
 	bcas_stream_parse(self, cbfn, user_data);
 }
 

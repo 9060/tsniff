@@ -25,7 +25,7 @@ typedef struct BCASStream BCASStream;
  * @param p	BCASPacket
  */
 #define BCAS_IS_ECM_RESPONSE_PACKET(p)				\
-	(((p)->header == 0x0040) && ((p)->len == 0x18))
+	(((p)->len == 0x18) && ((p)->payload[0] == 0x00) && ((p)->payload[1] == 0x15))
 
 #define BCAS_ECM_PACKET_FLAGS_INDEX 4
 #define BCAS_ECM_PACKET_KEY_INDEX 6
@@ -46,6 +46,6 @@ void
 bcas_stream_free(BCASStream *self);
 
 void
-bcas_stream_push(BCASStream *self, guint8 *data, uint len, BCASStreamCallbackFunc cbfn, gpointer user_data);
+bcas_stream_push(BCASStream *self, guint8 *data, guint len, BCASStreamCallbackFunc cbfn, gpointer user_data);
 
 #endif	/* BCAS_STREAM_H_INCLUDED */
