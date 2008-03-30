@@ -92,7 +92,7 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 			memcpy(self->pending_ecm_packet->key, &packet->payload[BCAS_ECM_PACKET_KEY_INDEX], BCAS_ECM_PACKET_KEY_SIZE);
 
 			/* ECMキューに追加 */
-			//g_message("register new ECM [%s]", dump_ecm_packet(self->pending_ecm_packet));
+			g_debug("register new ECM [%s]", dump_ecm_packet(self->pending_ecm_packet));
 			g_queue_push_tail(self->ecm_queue, self->pending_ecm_packet);
 			if (self->ecm_queue->length > self->ecm_queue_len) {
 				/* ECMキューの最大長を越えていたら、最も古い ECM を捨てる */
@@ -129,6 +129,8 @@ init_b_cas_card(void *bcas)
 	self->ecm_queue = g_queue_new();
 	self->ecm_queue_len = 128;
 	self->stream = bcas_stream_new();
+	self->pending_ecm_packet = NULL;
+	self->response_delay = 0;
 
 	return 0;
 }
@@ -167,7 +169,7 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 	src_packet.len = len;
 	memcpy(src_packet.data, src, len);
 
-	//g_message("search ECM [%s]", dump_ecm_packet(&src_packet));
+	g_debug("search ECM [%s]", dump_ecm_packet(&src_packet));
 
 	match = g_queue_find_custom(self->ecm_queue, &src_packet, compare_ecm_packet);
 	if (match) {
@@ -177,10 +179,10 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 	if (ecm) {
 		memcpy(dst->scramble_key, ecm->key, BCAS_ECM_PACKET_KEY_SIZE);
 		dst->return_code = ecm->flag;
-		//g_message(" find  ECM [%s]", dump_ecm_packet(ecm));
+		g_debug(" find  ECM [%s]", dump_ecm_packet(ecm));
 	} else {
 		/* not found */
-		//g_message("not found: %d", len);
+		g_debug("not found: %d", len);
 		return -1;
 	}
 

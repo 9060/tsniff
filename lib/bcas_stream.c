@@ -162,8 +162,10 @@ bcas_stream_free(BCASStream *self)
 void
 bcas_stream_push(BCASStream *self, guint8 *data, uint len, BCASStreamCallbackFunc cbfn, gpointer user_data)
 {
-	self->raw_stream = g_byte_array_append(self->raw_stream, data, len);
-	bcas_stream_parse(self, cbfn, user_data);
+	if (len > 0) {
+		self->raw_stream = g_byte_array_append(self->raw_stream, data, len);
+		bcas_stream_parse(self, cbfn, user_data);
+	}
 }
 
 

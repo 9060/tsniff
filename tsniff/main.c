@@ -39,7 +39,7 @@ static gboolean st_b25_is_enabled = FALSE;
 static gint st_b25_round = 4;
 static gboolean st_b25_strip = FALSE;
 static GOptionEntry st_b25_options[] = {
-	{ "enable", 'B', 0, G_OPTION_ARG_NONE, &st_b25_is_enabled, "Enable B25 decoder [disabled]", NULL },
+	{ "b25-enable", 'B', G_OPTION_FLAG_IN_MAIN, G_OPTION_ARG_NONE, &st_b25_is_enabled, "Enable B25 decoder [disabled]", NULL },
 	{ "round", 0, 0, G_OPTION_ARG_INT, &st_b25_round, "Set MULTI-2 round factor to N [4]", "N" },
 	{ "strip", 'S', 0, G_OPTION_ARG_NONE, &st_b25_strip, "Omit NULL packets [disabled]", NULL },
 	{ NULL }
@@ -48,6 +48,12 @@ static GOptionEntry st_b25_options[] = {
 
 static ARIB_STD_B25 *st_b25 = NULL;
 static B_CAS_CARD *st_bcas = NULL;
+
+
+/* Ring buffer
+   -------------------------------------------------------------------------- */
+static GQueue *st_b25_queue = NULL;
+static gsize st_b25_queue_size = 0;
 
 /* Callbacks
    -------------------------------------------------------------------------- */
@@ -61,20 +67,36 @@ transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 	if (st_b25) {
 		ARIB_STD_B25_BUFFER buffer;
 		gint ret;
+		gpointer *chunk;
 
-		buffer.data = data;
-		buffer.size = length;
-		ret = st_b25->put(st_b25, &buffer);
-		if (ret < 0) {
-			g_critical("b25->put %d", ret);
-		}
+		/* キューに積む */
+		chunk = g_slice_alloc(sizeof(gsize) + length);
+		*(gsize *)chunk = length;
+		memcpy(((gsize *)chunk) + 1, data, length);
+		g_queue_push_tail(st_b25_queue, chunk);
+		st_b25_queue_size += length;
 
-		ret = st_b25->get(st_b25, &buffer);
-		if (ret < 0) {
-			g_critical("b25->get %d", ret);
-		}
-		if (io) {
-			g_io_channel_write_chars(io, buffer.data, buffer.size, &written, &error);
+		while (st_b25_queue_size > 64*1024*1024) {
+			gpointer pop = g_queue_pop_head(st_b25_queue);
+			if (!pop) break;
+
+			buffer.size = *(gsize *)pop;
+			buffer.data = ((gsize *)pop) + 1;
+			ret = st_b25->put(st_b25, &buffer);
+			if (ret < 0) {
+				g_critical("b25->put %d", ret);
+			}
+
+			g_slice_free1(sizeof(gsize) + buffer.size, pop);
+			st_b25_queue_size -= buffer.size;
+
+			ret = st_b25->get(st_b25, &buffer);
+			if (ret < 0) {
+				g_critical("b25->get %d", ret);
+			}
+			if (io) {
+				g_io_channel_write_chars(io, buffer.data, buffer.size, &written, &error);
+			}
 		}
 	} else if (io) {
 		g_io_channel_write_chars(io, data, length, &written, &error);
@@ -88,7 +110,9 @@ transfer_bcas_cb(gpointer data, gint length, gpointer user_data)
 	GError *error = NULL;
 	gsize written;
 
+	g_debug("transfer_bcas_cb");
 	if (st_bcas) {
+		g_debug("bcas_card_streaming_push: len=%d", length);
 		bcas_card_streaming_push(st_bcas, data, length);
 	}
 	if (io) {
@@ -174,6 +198,8 @@ init_b25(void)
 
 	st_b25->set_b_cas_card(st_b25, st_bcas);
 
+	st_b25_queue = g_queue_new();
+
 	return TRUE;
 }
 
@@ -202,7 +228,7 @@ rec(void)
 		return;
 	}
 
-	capsts_exec_cmd(CMD_PORT_CFG, 0x00, PIO_START);
+	capsts_exec_cmd(CMD_PORT_CFG, 0x00, PIO_START|PIO_IR_OUT|PIO_TS_BACK);
 	capsts_exec_cmd(CMD_MODE_IDLE);
 	capsts_exec_cmd(CMD_IFCONFIG, 0xE3);
 	capsts_exec_cmd_queue(device);
@@ -217,6 +243,7 @@ rec(void)
 		}
 		g_io_channel_set_encoding(io_ts, NULL, &error);
 
+		g_message("Setup TS transfer");
 		transfer_ts = cusbfx2_init_bulk_transfer(device, "MPEG-TS", ENDPOINT_TS_IN,
 												 st_buffer_length, st_buffer_count,
 												 transfer_ts_cb, io_ts);
@@ -237,6 +264,7 @@ rec(void)
 	}
 
 	if (st_bcas_filename || st_b25_is_enabled) {
+		g_message("Setup B-CAS transfer");
 		transfer_bcas = cusbfx2_init_bulk_transfer(device, "B-CAS", ENDPOINT_BCAS_IN,
 												   512, 1, transfer_bcas_cb, io_bcas);
 		if (!transfer_bcas) {
@@ -246,7 +274,7 @@ rec(void)
 		capsts_exec_cmd(CMD_EP4IN_START);
 	}
 
-	capsts_exec_cmd(CMD_PORT_WRITE, PIO_START);
+	capsts_exec_cmd(CMD_PORT_WRITE, PIO_START|PIO_IR_OUT|PIO_TS_BACK);
 	capsts_exec_cmd_queue(device);
 
 	timer = g_timer_new();

@@ -5,7 +5,7 @@
 #include "cusbfx2.h"
 
 
-#define CUSBFX2_TRANSFER_TIMEOUT 2000
+#define CUSBFX2_TRANSFER_TIMEOUT 1000
 
 
 /* private */
