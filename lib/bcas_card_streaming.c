@@ -36,6 +36,21 @@ typedef struct Context {
 } Context;
 
 
+static gchar *
+dump_ecm_packet(ECMPacket *ecm)
+{
+	static gchar hexdump[2 * G_MAXUINT8 + 1];
+	gint i;
+
+	hexdump[0] = '\0';
+	for (i = 0; i < ecm->len; ++i) {
+		gchar x[3];
+		g_sprintf(x, "%02x", ecm->data[i]);
+		g_strlcat(hexdump, x, 2 * G_MAXUINT8);
+	}
+	return hexdump;
+}
+
 static void
 parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_data)
 {
@@ -73,10 +88,11 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 						  self->response_delay - 1);
 			}
 			self->pending_ecm_packet->flag = 
-				(packet->payload[BCAS_ECM_PACKET_FLAGS_INDEX] << 8) || packet->payload[BCAS_ECM_PACKET_FLAGS_INDEX + 1];
+				(packet->payload[BCAS_ECM_PACKET_FLAGS_INDEX] << 8) | packet->payload[BCAS_ECM_PACKET_FLAGS_INDEX + 1];
 			memcpy(self->pending_ecm_packet->key, &packet->payload[BCAS_ECM_PACKET_KEY_INDEX], BCAS_ECM_PACKET_KEY_SIZE);
 
 			/* ECMキューに追加 */
+			//g_message("register new ECM [%s]", dump_ecm_packet(self->pending_ecm_packet));
 			g_queue_push_tail(self->ecm_queue, self->pending_ecm_packet);
 			if (self->ecm_queue->length > self->ecm_queue_len) {
 				/* ECMキューの最大長を越えていたら、最も古い ECM を捨てる */
@@ -144,19 +160,27 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
 	gpointer data;
 	ECMPacket src_packet;
-	ECMPacket *ecm;
+	GList *match;
+	ECMPacket *ecm = NULL;
 
 	/* ECMキューからECMパケットを検索 */
 	src_packet.len = len;
 	memcpy(src_packet.data, src, len);
-	ecm = (ECMPacket *)g_queue_find_custom(self->ecm_queue, &src_packet, compare_ecm_packet);
+
+	//g_message("search ECM [%s]", dump_ecm_packet(&src_packet));
+
+	match = g_queue_find_custom(self->ecm_queue, &src_packet, compare_ecm_packet);
+	if (match) {
+		ecm = match->data;
+	}
 
 	if (ecm) {
 		memcpy(dst->scramble_key, ecm->key, BCAS_ECM_PACKET_KEY_SIZE);
 		dst->return_code = ecm->flag;
-		g_message("hit: %d", len);
+		//g_message(" find  ECM [%s]", dump_ecm_packet(ecm));
 	} else {
 		/* not found */
+		//g_message("not found: %d", len);
 		return -1;
 	}
 
