@@ -1,1 +1,1 @@
-SUBDIRS = libusb
+SUBDIRS = b25 libusb

@@ -135,7 +135,7 @@ release_b_cas_card(void *bcas)
 
 static int get_init_status_b_cas_card(void *bcas, B_CAS_INIT_STATUS *stat)
 {
-	memcpy(stat, &(st_bcas_init_status), sizeof(B_CAS_INIT_STATUS));
+	memcpy(stat, &st_bcas_init_status, sizeof(B_CAS_INIT_STATUS));
 	return 0;
 }
 

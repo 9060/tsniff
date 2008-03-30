@@ -1,5 +1,5 @@
 #!/bin/sh
-libtoolize --copy --force || exit 1
+#libtoolize --copy --force || exit 1
 aclocal || exit 1
 autoheader || exit 1
 autoconf || exit 1
