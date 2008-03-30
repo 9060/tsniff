@@ -29,7 +29,7 @@ typedef struct ECMPacket {
 typedef struct Context {
 	BCASStream *stream;
 	GQueue *ecm_queue;
-	gint ecm_queue_len;
+	guint ecm_queue_len;
 
 	ECMPacket *pending_ecm_packet;
 	gint response_delay;
@@ -60,7 +60,7 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 			self->pending_ecm_packet = g_slice_new(ECMPacket);
 		}
 		self->pending_ecm_packet->len = packet->len;
-		g_memcpy(self->pending_ecm_packet->data, packet->payload, packet->len);
+		memcpy(self->pending_ecm_packet->data, packet->payload, packet->len);
 
 		self->response_delay = 0;
 	} else if (BCAS_IS_ECM_RESPONSE_PACKET(packet)) {
@@ -74,11 +74,11 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 			}
 			self->pending_ecm_packet->flag = 
 				(packet->payload[BCAS_ECM_PACKET_FLAGS_INDEX] << 8) || packet->payload[BCAS_ECM_PACKET_FLAGS_INDEX + 1];
-			g_memcpy(self->pending_ecm_packet->key, &packet->payload[BCAS_ECM_PACKET_KEY_INDEX], BCAS_ECM_PACKET_KEY_SIZE);
+			memcpy(self->pending_ecm_packet->key, &packet->payload[BCAS_ECM_PACKET_KEY_INDEX], BCAS_ECM_PACKET_KEY_SIZE);
 
 			/* ECMキューに追加 */
 			g_queue_push_tail(self->ecm_queue, self->pending_ecm_packet);
-			if (g_gueue_get_length(self->ecm_queue) > self->ecm_queue_len) {
+			if (self->ecm_queue->length > self->ecm_queue_len) {
 				/* ECMキューの最大長を越えていたら、最も古い ECM を捨てる */
 				g_slice_free(ECMPacket, g_queue_pop_head(self->ecm_queue));
 			}
@@ -148,14 +148,15 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 
 	/* ECMキューからECMパケットを検索 */
 	src_packet.len = len;
-	g_memcpy(src_packet.data, src, len);
+	memcpy(src_packet.data, src, len);
 	ecm = (ECMPacket *)g_queue_find_custom(self->ecm_queue, &src_packet, compare_ecm_packet);
 
 	if (ecm) {
-		g_memcpy(dst->scramble_key, ecm->key, BCAS_ECM_PACKET_KEY_SIZE);
-		dst->return_code = 0x0200;
+		memcpy(dst->scramble_key, ecm->key, BCAS_ECM_PACKET_KEY_SIZE);
+		dst->return_code = ecm->flag;
 	} else {
 		/* not found */
+		return -1;
 	}
 
 	return 0;
@@ -178,6 +179,13 @@ bcas_card_streaming_new(void)
 	r->proc_ecm = proc_ecm_b_cas_card;
 
 	return r;
+}
+
+void
+bcas_card_streaming_set_queue_len(B_CAS_CARD *bcas, guint len)
+{
+	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
+	self->ecm_queue_len = len;
 }
 
 void
