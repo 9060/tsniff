@@ -25,8 +25,10 @@ typedef struct BCASStream BCASStream;
  * @param p	BCASPacket
  */
 #define BCAS_IS_ECM_RESPONSE_PACKET(p)				\
-	(((p)->len == 0x18) && ((p)->payload[0] == 0x00) && ((p)->payload[1] == 0x15))
+	(((p)->len == 0x19) && ((p)->payload[0] == 0x00) && ((p)->payload[1] == 0x15))
 
+#define BCAS_ECM_PACKET_DATA_LEN_INDEX 4
+#define BCAS_ECM_PACKET_DATA_INDEX 5
 #define BCAS_ECM_PACKET_FLAGS_INDEX 4
 #define BCAS_ECM_PACKET_KEY_INDEX 6
 #define BCAS_ECM_PACKET_KEY_SIZE 16

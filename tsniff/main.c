@@ -87,8 +87,8 @@ adjust_tuner_channel(cusbfx2_handle *device)
 		}
 	}
 
-	capsts_ir_cmd_send(device);
-	g_usleep(2500 * 1000);
+	//capsts_ir_cmd_send(device);
+	//g_usleep(2500 * 1000);
 }
 
 static void
@@ -152,7 +152,7 @@ rec(void)
 	timer = g_timer_new();
 	for (;;) {
 		cusbfx2_poll();
-		if (g_timer_elapsed(timer, NULL) > 15.0) {
+		if (g_timer_elapsed(timer, NULL) > 60.0) {
 			break;
 		}
 	}

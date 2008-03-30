@@ -92,9 +92,11 @@ main(int argc, char **argv)
 		src_buf.size = readed;
 
 		if (b25->put(b25, &src_buf) < 0) {
-			return 1;
+			g_critical("error on b25->put");
+			//return 1;
 		}
 		if (b25->get(b25, &dst_buf) < 0) {
+			g_critical("error on b25->get");
 			return 1;
 		}
 

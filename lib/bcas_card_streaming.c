@@ -59,8 +59,8 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 		} else {
 			self->pending_ecm_packet = g_slice_new(ECMPacket);
 		}
-		self->pending_ecm_packet->len = packet->len;
-		memcpy(self->pending_ecm_packet->data, packet->payload, packet->len);
+		self->pending_ecm_packet->len = packet->payload[BCAS_ECM_PACKET_DATA_LEN_INDEX];
+		memcpy(self->pending_ecm_packet->data, &packet->payload[BCAS_ECM_PACKET_DATA_INDEX], self->pending_ecm_packet->len);
 
 		self->response_delay = 0;
 	} else if (BCAS_IS_ECM_RESPONSE_PACKET(packet)) {
@@ -154,6 +154,7 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 	if (ecm) {
 		memcpy(dst->scramble_key, ecm->key, BCAS_ECM_PACKET_KEY_SIZE);
 		dst->return_code = ecm->flag;
+		g_message("hit: %d", len);
 	} else {
 		/* not found */
 		return -1;
