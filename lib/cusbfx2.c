@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #include <glib.h>
 #include <libusb.h>
@@ -19,6 +20,32 @@ struct cusbfx2_transfer {
 	cusbfx2_transfer_cb_fn callback;
 	gpointer user_data;
 };
+
+typedef struct {
+	guint8 bLength;
+	guint8 bDescriptorType;
+	guint16 wData[255];
+} string_descriptor;
+
+static gchar *
+cusbfx2_get_manufacturer(libusb_device_handle *handle)
+{
+	string_descriptor *desc;
+	guint8 buf[256], result[256];
+	gint i;
+	struct libusb_device_descriptor *device = libusb_get_device_descriptor(libusb_get_device(handle));
+	libusb_control_transfer(handle, LIBUSB_RECIPIENT_DEVICE|LIBUSB_REQUEST_TYPE_STANDARD|LIBUSB_ENDPOINT_IN,
+							LIBUSB_REQUEST_GET_DESCRIPTOR,
+							(LIBUSB_DT_STRING << 8) | device->iManufacturer,
+							0x0000, buf, sizeof(buf) - 1, 1000);
+	desc = (string_descriptor *)buf;
+
+	for (i = 0; i < (desc->bLength - 2) / 2; ++i) {
+		result[i] = desc->wData[i] & 0xFF;
+	}
+	result[i] = '\0';
+	return g_strdup(result);
+}
 
 /**
  * @param id
@@ -83,9 +110,6 @@ cusbfx2_find_open(guint8 id)
 static gint
 cusbfx2_load_firmware(libusb_device_handle *dev, guint8 id, guint8 *firmware, const gchar *firmware_id)
 {
-	/* TODO: libusb から String Descriptor にアクセスする手段が無いため、
-	   ファームウェアの判別ができない */
-
 	static const guint8 descriptor_pattern[] = { 0xB4, 0x04, 0x04, 0x10, 0x00, 0x00 };
 	guint8 *patch_ptr = NULL;
 	guint16 len, ofs;
@@ -190,28 +214,37 @@ cusbfx2_open(guint8 id, guint8 *firmware, const gchar *firmware_id)
 
 	if (firmware) {
 		gint i;
-		g_message("cusbfx2_open: loading firmware");
-		cusbfx2_load_firmware(usb_handle, id, firmware, firmware_id);
+		gchar *manufacturer;
 
-		/* 再起動後のファームウェアに接続 */
-		g_message("cusbfx2_open: reload device");
-		ret = libusb_release_interface(usb_handle, 0);
-		if (ret) {
-			g_critical("cusbfx2_open: libusb_release_interface failed (%d)", ret);
-		}
+		manufacturer = cusbfx2_get_manufacturer(usb_handle);
+		if (!strcmp(manufacturer, firmware_id)) {
+			g_message("Firmware <%s> already loaded", manufacturer);
+			g_free(manufacturer);
+		} else {
+			g_free(manufacturer);
+			g_message("cusbfx2_open: loading firmware");
+			cusbfx2_load_firmware(usb_handle, id, firmware, firmware_id);
 
-		libusb_close(usb_handle);
+			/* 再起動後のファームウェアに接続 */
+			g_message("cusbfx2_open: reload device");
+			ret = libusb_release_interface(usb_handle, 0);
+			if (ret) {
+				g_critical("cusbfx2_open: libusb_release_interface failed (%d)", ret);
+			}
 
-		for (i = 0; i < CUSBFX2_REOPEN_RETRY_MAX; ++i) {
-			usb_handle = cusbfx2_find_open(id);
-			if (usb_handle)
-				break;
-			g_usleep(CUSBFX2_REOPEN_RETRY_WAIT);
-		}
+			libusb_close(usb_handle);
 
-		if (!usb_handle) {
-			g_critical("cusbfx2_open: cusbfx2_find_open(id=%d) failed", id);
-			return NULL;
+			for (i = 0; i < CUSBFX2_REOPEN_RETRY_MAX; ++i) {
+				usb_handle = cusbfx2_find_open(id);
+				if (usb_handle)
+					break;
+				g_usleep(CUSBFX2_REOPEN_RETRY_WAIT);
+			}
+
+			if (!usb_handle) {
+				g_critical("cusbfx2_open: cusbfx2_find_open(id=%d) failed", id);
+				return NULL;
+			}
 		}
 	}
 

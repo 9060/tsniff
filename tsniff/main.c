@@ -110,7 +110,6 @@ transfer_bcas_cb(gpointer data, gint length, gpointer user_data)
 	GError *error = NULL;
 	gsize written;
 
-	g_debug("transfer_bcas_cb");
 	if (st_bcas) {
 		g_debug("bcas_card_streaming_push: len=%d", length);
 		bcas_card_streaming_push(st_bcas, data, length);
@@ -222,7 +221,7 @@ rec(void)
 	g_message("capsts_set_ir_base: %d", st_ir_base);
 	capsts_set_ir_base(st_ir_base);
 
-	device = cusbfx2_open(st_fx2id, st_firmware, "FX2_FIFO");
+	device = cusbfx2_open(st_fx2id, st_firmware, "FX2_FIFO_ATTY01");
 	if (!device) {
 		g_critical("Couldn't open CUSBFX2 device");
 		return;
