@@ -60,7 +60,7 @@ static GOptionEntry st_b25_options[] = {
 
 static gchar *st_ts_filename = NULL;
 static gchar *st_bcas_filename = NULL;
-static gboolean st_is_verbose = TRUE;
+static gboolean st_is_verbose = FALSE;
 static gboolean st_is_quiet = FALSE;
 static GOptionEntry st_main_options[] = {
 	{ "ts-filename", 't', 0, G_OPTION_ARG_FILENAME, &st_ts_filename,
@@ -68,9 +68,9 @@ static GOptionEntry st_main_options[] = {
 	{ "bcas-filename", 'b', 0, G_OPTION_ARG_FILENAME, &st_bcas_filename,
 	  "Output B-CAS stream to FILENAME", "FILENAME" },
 	{ "verbose", 'v', 0, G_OPTION_ARG_NONE, &st_is_verbose,
-	  "Verbose messages", NULL },
+	  "Verbose messages [disabled]", NULL },
 	{ "quiet", 'q', 0, G_OPTION_ARG_NONE, &st_is_quiet,
-	  "Quiet messages", NULL },
+	  "Quiet messages [disabled]", NULL },
 	{ NULL }
 };
 
