@@ -10,26 +10,37 @@
 
 /* Options
    -------------------------------------------------------------------------- */
-static gint st_fx2id = 0;
 static gchar *st_ts_filename = NULL;
 static gchar *st_bcas_filename = NULL;
 static gint st_buffer_length = 16384;
 static gint st_buffer_count = 16;
-static gint st_ir_base = 0;
-static gint st_source = -1;
-static gint st_channel = -1;
-static gchar *st_long_channel = NULL;
 static gint st_bcas_queue_len = 128;
 
 static GOptionEntry st_main_options[] = {
-	{ "fx2id", 'i', 0, G_OPTION_ARG_INT, &st_fx2id, "Set device id to ID [0]", "ID" },
 	{ "ts-filename", 't', 0, G_OPTION_ARG_FILENAME, &st_ts_filename, "Output MPEG2-TS to FILENAME", "FILENAME" },
 	{ "bcas-filename", 'b', 0, G_OPTION_ARG_FILENAME, &st_bcas_filename, "Output B-CAS stream to FILENAME", "FILENAME" },
-	{ "ir-base", 'I', 0, G_OPTION_ARG_INT, &st_ir_base, "Set IR base channel to N (1..3) [1]", "N" },
-	{ "source", 's', 0, G_OPTION_ARG_INT, &st_source, "Set tuner source to SOURCE (0:Digital 1:BS 2:CS)", "SOURCE" },
-	{ "channel", 'c', 0, G_OPTION_ARG_INT, &st_channel, "Set tuner channel to C (1..12)", "C" },
-	{ "long-channel", 'C', 0, G_OPTION_ARG_STRING, &st_long_channel, "Set tuner channel to CCC", "CCC" },
-	{ "bcas-queue", 'q', 0, G_OPTION_ARG_INT, &st_bcas_queue_len, "Set B-CAS queue length to N [128]", "N" },
+	{ "bcas-queue", 0, 0, G_OPTION_ARG_INT, &st_bcas_queue_len, "Set B-CAS queue length to N [128]", "N" },
+	{ NULL }
+};
+
+static gint st_fx2_id = 0;		/* CUSBFX2のID */
+static gboolean st_fx2_is_force_load = FALSE; /* CUSBFX2のファームウェアを強制的にロードする */
+static GOptionEntry st_fx2_options[] = {
+	{ "fx2-id", 0, 0, G_OPTION_ARG_INT, &st_fx2_id, "Find CUSBFX2 it has ID N [0]", "N" },
+	{ "fx2-force-load", 0, 0, G_OPTION_ARG_NONE, &st_fx2_is_force_load, "Force load the firmware [disabled]", NULL },
+	{ NULL }
+};
+
+
+static gint st_ir_base = 0;
+static gint st_ir_source = -1;
+static gint st_ir_channel = -1;
+static gchar *st_ir_three_channel = NULL;
+static GOptionEntry st_ir_options[] = {
+	{ "ir-base", 0, 0, G_OPTION_ARG_INT, &st_ir_base, "Set IR base channel to N (1..3) [1]", "N" },
+	{ "ir-source", 's', 0, G_OPTION_ARG_INT, &st_ir_source, "Set tuner source to N (0:Terestrial 1:BS 2:CS)", "N" },
+	{ "ir-channel", 'c', 0, G_OPTION_ARG_INT, &st_ir_channel, "Set tuner channel to C (1..12)", "C" },
+	{ "ir-three-channel", '3', 0, G_OPTION_ARG_STRING, &st_ir_three_channel, "Set tuner channel to CCC (BS/CS only)", "CCC" },
 	{ NULL }
 };
 
@@ -37,9 +48,9 @@ static gboolean st_b25_is_enabled = FALSE;
 static gint st_b25_round = 4;
 static gboolean st_b25_strip = FALSE;
 static GOptionEntry st_b25_options[] = {
-	{ "b25-enable", 'B', G_OPTION_FLAG_IN_MAIN, G_OPTION_ARG_NONE, &st_b25_is_enabled, "Enable B25 decoder [disabled]", NULL },
-	{ "round", 0, 0, G_OPTION_ARG_INT, &st_b25_round, "Set MULTI-2 round factor to N [4]", "N" },
-	{ "strip", 'S', 0, G_OPTION_ARG_NONE, &st_b25_strip, "Omit NULL packets [disabled]", NULL },
+	{ "b25-enable", 'B', 0, G_OPTION_ARG_NONE, &st_b25_is_enabled, "Enable B25 decoder [disabled]", NULL },
+	{ "b25-round", 0, 0, G_OPTION_ARG_INT, &st_b25_round, "Set MULTI-2 round factor to N [4]", "N" },
+	{ "b25-strip", 'S', 0, G_OPTION_ARG_NONE, &st_b25_strip, "Discard NULL packets from output [disabled]", NULL },
 	{ NULL }
 };
 
@@ -174,7 +185,7 @@ rec(void)
 	g_message("capsts_set_ir_base: %d", st_ir_base);
 	capsts_set_ir_base(st_ir_base);
 
-	device = capsts_open(st_fx2id, FALSE);
+	device = capsts_open(st_fx2_id, st_fx2_is_force_load);
 	if (!device) {
 		return;
 	}
@@ -184,7 +195,7 @@ rec(void)
 	capsts_cmd_push(CMD_IFCONFIG, 0xE3);
 	capsts_cmd_commit(device);
 
-	capsts_adjust_tuner_channel(device, st_source, st_channel, st_long_channel);
+	capsts_adjust_tuner_channel(device, st_ir_source, st_ir_channel, st_ir_three_channel);
 
 	if (st_ts_filename) {
 		io_ts = g_io_channel_new_file(st_ts_filename, "w", &error);
@@ -255,11 +266,19 @@ parse_options(int *argc, char ***argv)
 {
 	GError *error = NULL;
 	GOptionContext *context;
-	GOptionGroup *group_b25;
+	GOptionGroup *group_fx2, *group_ir, *group_b25;
 
-	context = g_option_context_new("- CUSBFX2 MPEG2-TS Sniffer");
+	context = g_option_context_new("-- MPEG2-TS Sniffer");
 	g_option_context_set_help_enabled(context, TRUE);
 	g_option_context_add_main_entries(context, st_main_options, NULL);
+
+	group_fx2 = g_option_group_new("fx2", "Chameleon USB FX2 Options:", "Show CUSBFX2 options", NULL, NULL);
+	g_option_group_add_entries(group_fx2, st_fx2_options);
+	g_option_context_add_group(context, group_fx2);
+
+	group_ir = g_option_group_new("ir", "Infrared Receiver Control Options:", "Show IR options", NULL, NULL);
+	g_option_group_add_entries(group_ir, st_ir_options);
+	g_option_context_add_group(context, group_ir);
 
 	group_b25 = g_option_group_new("b25", "ARIB STD-B25 Deocder Options:", "Show ARIB STD-B25 deocder options", NULL, NULL);
 	g_option_group_add_entries(group_b25, st_b25_options);
@@ -270,17 +289,17 @@ parse_options(int *argc, char ***argv)
 	}
 
 	st_ir_base = CLAMP(st_ir_base, 1, 3);
-	st_source = CLAMP(st_source, -1, 2);
-	st_channel = CLAMP(st_channel, -1, 12);
+	st_ir_source = CLAMP(st_ir_source, -1, 2);
+	st_ir_channel = CLAMP(st_ir_channel, -1, 12);
 
 	/* 3桁チャンネルのフォーマットチェック */
-	if (st_long_channel) {
+	if (st_ir_three_channel) {
 		gboolean is_valid = TRUE;
 		gchar *p;
-		if (strlen(st_long_channel) != 3) {
+		if (strlen(st_ir_three_channel) != 3) {
 			is_valid = FALSE;
 		} else {
-			for (p = st_long_channel; *p; ++p) {
+			for (p = st_ir_three_channel; *p; ++p) {
 				if (!g_ascii_isdigit(*p)) {
 					is_valid = FALSE;
 					break;
