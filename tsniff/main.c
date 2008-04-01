@@ -1,4 +1,6 @@
+#include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <glib.h>
 #include "cusbfx2.h"
 #include "capsts.h"
@@ -294,6 +296,30 @@ parse_options(int *argc, char ***argv)
 	return TRUE;
 }
 
+static void
+log_handler(const gchar *log_domain, GLogLevelFlags log_level, const gchar *message, gpointer user_data)
+{
+	gchar asctime[32];
+	GTimeVal now;
+	const gchar *level;
+	struct tm now_tm;
+
+	g_get_current_time(&now);
+	localtime_r(&now.tv_sec, &now_tm);
+	
+	strftime(asctime, sizeof(asctime), "%Y-%m-%d %H:%M:%S", &now_tm);
+
+	if (log_level & G_LOG_LEVEL_ERROR) level = "ERROR";
+	else if (log_level & G_LOG_LEVEL_CRITICAL) level = "CRITI";
+	else if (log_level & G_LOG_LEVEL_WARNING) level = "WARNI";
+	else if (log_level & G_LOG_LEVEL_MESSAGE) level = "INFO ";
+	else if (log_level & G_LOG_LEVEL_INFO) level = "INFO ";
+	else if (log_level & G_LOG_LEVEL_DEBUG) level = "DEBUG";
+	else level = "";
+
+	g_fprintf(stderr, "%s,%03d %s [%s] %s\n", asctime, now.tv_usec / 1000, level, log_domain ? log_domain : "", message);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -302,7 +328,11 @@ main(int argc, char **argv)
 	}
 
 	g_log_set_handler(NULL, G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
-					  g_log_default_handler, NULL);
+					  log_handler, NULL);
+	g_log_set_handler("cusbfx2", G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
+					  log_handler, NULL);
+	g_log_set_handler("capsts", G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
+					  log_handler, NULL);
 
 	cusbfx2_init();
 

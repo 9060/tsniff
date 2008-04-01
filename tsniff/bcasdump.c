@@ -104,7 +104,7 @@ main(int argc, char **argv)
 
 	cusbfx2_init();
 
-	device = cusbfx2_open(st_fx2id, st_firmware, "FX2_FIFO");
+	device = cusbfx2_open(st_fx2id, st_firmware, "FX2_FIFO", FALSE);
 	if (!device) {
 		goto quit;
 	}

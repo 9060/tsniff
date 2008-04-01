@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#define G_LOG_DOMAIN "cusbfx2"
 #include <glib.h>
 #include <libusb.h>
 

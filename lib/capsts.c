@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdarg.h>
+#define G_LOG_DOMAIN "capsts"
 #include <glib.h>
 #include "cusbfx2.h"
 #include "capsts.h"
