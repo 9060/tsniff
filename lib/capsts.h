@@ -137,10 +137,10 @@ typedef enum CapStsTunerSource {
 } CapStsTunerSource;
 
 void
-capsts_exec_cmd(guint8 cmd, ...);
+capsts_cmd_push(guint8 cmd, ...);
 
-void
-capsts_exec_cmd_queue(cusbfx2_handle *device);
+gboolean
+capsts_cmd_commit(cusbfx2_handle *device);
 
 /* IR Interfaces
    -------------------------------------------------------------------------- */
@@ -148,10 +148,10 @@ void
 capsts_set_ir_base(gint base);
 
 void
-capsts_ir_cmd_append(CapStsIrCommand cmd);
+capsts_ir_cmd_push(CapStsIrCommand cmd);
 
 gboolean
-capsts_ir_cmd_send(cusbfx2_handle *device);
+capsts_ir_cmd_commit(cusbfx2_handle *device);
 
 gboolean
 capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, gint channel, const gchar *three_channel);

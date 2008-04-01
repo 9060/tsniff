@@ -182,10 +182,10 @@ rec(void)
 		return;
 	}
 
-	capsts_exec_cmd(CMD_PORT_CFG, 0x00, PIO_START|PIO_IR_OUT|PIO_TS_BACK);
-	capsts_exec_cmd(CMD_MODE_IDLE);
-	capsts_exec_cmd(CMD_IFCONFIG, 0xE3);
-	capsts_exec_cmd_queue(device);
+	capsts_cmd_push(CMD_PORT_CFG, 0x00, PIO_START|PIO_IR_OUT|PIO_TS_BACK);
+	capsts_cmd_push(CMD_MODE_IDLE);
+	capsts_cmd_push(CMD_IFCONFIG, 0xE3);
+	capsts_cmd_commit(device);
 
 	capsts_adjust_tuner_channel(device, st_source, st_channel, st_long_channel);
 
@@ -205,7 +205,7 @@ rec(void)
 			g_critical("Couldn't setup TS transfer");
 			goto quit;
 		}
-		capsts_exec_cmd(CMD_EP6IN_START);
+		capsts_cmd_push(CMD_EP6IN_START);
 	}
 
 	if (st_bcas_filename) {
@@ -225,11 +225,11 @@ rec(void)
 			g_critical("Couldn't setup B-CAS transfer");
 			goto quit;
 		}
-		capsts_exec_cmd(CMD_EP4IN_START);
+		capsts_cmd_push(CMD_EP4IN_START);
 	}
 
-	capsts_exec_cmd(CMD_PORT_WRITE, PIO_START|PIO_IR_OUT|PIO_TS_BACK);
-	capsts_exec_cmd_queue(device);
+	capsts_cmd_push(CMD_PORT_WRITE, PIO_START|PIO_IR_OUT|PIO_TS_BACK);
+	capsts_cmd_commit(device);
 
 	timer = g_timer_new();
 	for (;;) {
@@ -240,10 +240,10 @@ rec(void)
 	}
 	g_timer_destroy(timer);
 
-	if (st_ts_filename) capsts_exec_cmd(CMD_EP6IN_STOP);
-	if (st_bcas_filename || st_b25_is_enabled) capsts_exec_cmd(CMD_EP4IN_STOP);
-	capsts_exec_cmd(CMD_MODE_IDLE);
-	capsts_exec_cmd_queue(device);
+	if (st_ts_filename) capsts_cmd_push(CMD_EP6IN_STOP);
+	if (st_bcas_filename || st_b25_is_enabled) capsts_cmd_push(CMD_EP4IN_STOP);
+	capsts_cmd_push(CMD_MODE_IDLE);
+	capsts_cmd_commit(device);
 
  quit:
 	cusbfx2_free_transfer(transfer_ts);

@@ -4,13 +4,16 @@
 #include "cusbfx2.h"
 #include "capsts.h"
 
-static GByteArray *st_cmd_queue = NULL;
+static GByteArray *st_cmd_queue = NULL; /* CAPSTSファームウェアコマンドの送信キュー */
 
-static GArray *st_ir_cmd_queue = NULL;
-static gint st_ir_base = 0;
+static GArray *st_ir_cmd_queue = NULL; /* IRコマンドの送信キュー */
+static gint st_ir_base = 0;		/** IRのベースチャンネル */
 
+/**
+ * CAPSTSファームウェアへのコマンドをキューに追加する。
+ */
 void
-capsts_exec_cmd(guint8 cmd, ...)
+capsts_cmd_push(guint8 cmd, ...)
 {
     va_list ap;
 
@@ -67,15 +70,25 @@ capsts_exec_cmd(guint8 cmd, ...)
     va_end(ap);
 }
 
-void
-capsts_exec_cmd_queue(cusbfx2_handle *device)
+/**
+ * CAPSTSファームウェアへのコマンドキューを実際に送信する。
+ */
+gboolean
+capsts_cmd_commit(cusbfx2_handle *device)
 {
+	gboolean result = TRUE;
+
 	g_assert(st_cmd_queue);
 
-	cusbfx2_bulk_transfer(device, ENDPOINT_CMD_OUT, st_cmd_queue->data, st_cmd_queue->len);
+	if (cusbfx2_bulk_transfer(device, ENDPOINT_CMD_OUT, st_cmd_queue->data, st_cmd_queue->len) != st_cmd_queue->len) {
+		g_warning("capsts_cmd_commit: cusbfx2_bulk_transfer failed");
+		result = FALSE;
+	}
 
 	g_byte_array_free(st_cmd_queue, TRUE);
 	st_cmd_queue = NULL;
+
+	return result;
 }
 
 /**
@@ -95,7 +108,7 @@ capsts_set_ir_base(gint base)
  * @param cmd	追加するコマンド
  */
 void
-capsts_ir_cmd_append(CapStsIrCommand cmd)
+capsts_ir_cmd_push(CapStsIrCommand cmd)
 {
 	/* まだキューが無ければ作成 */
     if (!st_ir_cmd_queue) {
@@ -111,7 +124,7 @@ capsts_ir_cmd_append(CapStsIrCommand cmd)
  * @param device
  */
 gboolean
-capsts_ir_cmd_send(cusbfx2_handle *device)
+capsts_ir_cmd_commit(cusbfx2_handle *device)
 {
 	guint i;
 	guint8 cmds[3] = { CMD_IR_CODE };
@@ -162,13 +175,13 @@ capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, gi
 	/* まず入力ソースを切り替える */
 	switch (source) {
 	case TUNER_SOURCE_TERESTRIAL:
-		capsts_ir_cmd_append(IR_CMD_DIGITAL_TERESTRIAL1);
+		capsts_ir_cmd_push(IR_CMD_DIGITAL_TERESTRIAL1);
 		break;
 	case TUNER_SOURCE_BS:
-		capsts_ir_cmd_append(IR_CMD_FORMAT_BS);
+		capsts_ir_cmd_push(IR_CMD_FORMAT_BS);
 		break;
 	case TUNER_SOURCE_CS:
-		capsts_ir_cmd_append(IR_CMD_FORMAT_CS);
+		capsts_ir_cmd_push(IR_CMD_FORMAT_CS);
 		break;
 	default:
 		/* 現在の入力ソースのまま切り替えない */
@@ -177,7 +190,7 @@ capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, gi
 
 	/* 入力がBS/CSかつ3桁チャンネルが指定されていれば、3桁チャンネル入力によってチャンネルを変更 */
 	if (three_channel && source != TUNER_SOURCE_TERESTRIAL) {
-		capsts_ir_cmd_append(IR_CMD_3DIGIT_INPUT);
+		capsts_ir_cmd_push(IR_CMD_3DIGIT_INPUT);
 
 		if (strlen(three_channel) != 3) {
 			g_critical("Invalid channel format (must be three digit)");
@@ -186,18 +199,18 @@ capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, gi
 		} else {
 			const gchar *p;
 			for (p = three_channel; *p; ++p) {
-				capsts_ir_cmd_append(IR_CMD_0 + CLAMP(g_ascii_digit_value(*p), 0, 9));
+				capsts_ir_cmd_push(IR_CMD_0 + CLAMP(g_ascii_digit_value(*p), 0, 9));
 			}
 		}
 	} else if (channel >= 1 && channel <= 12) {
 		/* 通常のチャンネルが指定されていれば、変更 */
 		static CapStsIrCommand cmd[] = { IR_CMD_1, IR_CMD_2, IR_CMD_3, IR_CMD_4, IR_CMD_5, IR_CMD_6,
 										 IR_CMD_7, IR_CMD_8, IR_CMD_9, IR_CMD_0, IR_CMD_11, IR_CMD_12 };
-		capsts_ir_cmd_append(cmd[CLAMP(channel, 1, 12) - 1]);
+		capsts_ir_cmd_push(cmd[CLAMP(channel, 1, 12) - 1]);
 	}
 
 	if (st_ir_cmd_queue->len > 0) {
-		if (!capsts_ir_cmd_send(device)) {
+		if (!capsts_ir_cmd_commit(device)) {
 			if (st_ir_cmd_queue) g_array_free(st_ir_cmd_queue, TRUE);
 			return FALSE;
 		}

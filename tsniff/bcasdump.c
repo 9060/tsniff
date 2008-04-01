@@ -109,10 +109,10 @@ main(int argc, char **argv)
 		goto quit;
 	}
 
-	capsts_exec_cmd(CMD_PORT_CFG, 0x00, PIO_START);
-	capsts_exec_cmd(CMD_MODE_IDLE);
-	capsts_exec_cmd(CMD_IFCONFIG, 0xE3);
-	capsts_exec_cmd_queue(device);
+	capsts_cmd_push(CMD_PORT_CFG, 0x00, PIO_START);
+	capsts_cmd_push(CMD_MODE_IDLE);
+	capsts_cmd_push(CMD_IFCONFIG, 0xE3);
+	capsts_cmd_commit(device);
 
 	if (st_bcas_filename) {
 		io_bcas = g_io_channel_new_file(st_bcas_filename, "w", &error);
@@ -128,9 +128,9 @@ main(int argc, char **argv)
 		goto quit;
 	}
 
-	capsts_exec_cmd(CMD_EP4IN_START);
-	capsts_exec_cmd(CMD_PORT_WRITE, PIO_START);
-	capsts_exec_cmd_queue(device);
+	capsts_cmd_push(CMD_EP4IN_START);
+	capsts_cmd_push(CMD_PORT_WRITE, PIO_START);
+	capsts_cmd_commit(device);
 
 	/* dump */
 	while (st_is_running) {
@@ -141,9 +141,9 @@ main(int argc, char **argv)
 	/* finalize */
  quit:
 	if (transfer_bcas) {
-		capsts_exec_cmd(CMD_EP4IN_STOP);
-		capsts_exec_cmd(CMD_MODE_IDLE);
-		capsts_exec_cmd_queue(device);
+		capsts_cmd_push(CMD_EP4IN_STOP);
+		capsts_cmd_push(CMD_MODE_IDLE);
+		capsts_cmd_commit(device);
 	}
 	cusbfx2_free_transfer(transfer_bcas);
 	g_io_channel_close(io_bcas);
