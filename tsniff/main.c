@@ -60,11 +60,17 @@ static GOptionEntry st_b25_options[] = {
 
 static gchar *st_ts_filename = NULL;
 static gchar *st_bcas_filename = NULL;
+static gboolean st_is_verbose = TRUE;
+static gboolean st_is_quiet = FALSE;
 static GOptionEntry st_main_options[] = {
 	{ "ts-filename", 't', 0, G_OPTION_ARG_FILENAME, &st_ts_filename,
 	  "Output MPEG2-TS to FILENAME", "FILENAME" },
 	{ "bcas-filename", 'b', 0, G_OPTION_ARG_FILENAME, &st_bcas_filename,
 	  "Output B-CAS stream to FILENAME", "FILENAME" },
+	{ "verbose", 'v', 0, G_OPTION_ARG_NONE, &st_is_verbose,
+	  "Verbose messages", NULL },
+	{ "quiet", 'q', 0, G_OPTION_ARG_NONE, &st_is_quiet,
+	  "Quiet messages", NULL },
 	{ NULL }
 };
 
@@ -356,16 +362,17 @@ log_handler(const gchar *log_domain, GLogLevelFlags log_level, const gchar *mess
 int
 main(int argc, char **argv)
 {
+	GLogLevelFlags log_level = (G_LOG_LEVEL_MASK & ~G_LOG_LEVEL_DEBUG) | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION;
+
 	if (!parse_options(&argc, &argv)) {
 		return 1;
 	}
 
-	g_log_set_handler(NULL, G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
-					  log_handler, NULL);
-	g_log_set_handler("cusbfx2", G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
-					  log_handler, NULL);
-	g_log_set_handler("capsts", G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
-					  log_handler, NULL);
+	if (st_is_verbose) log_level |= G_LOG_LEVEL_DEBUG;
+	if (st_is_quiet) log_level &= ~(G_LOG_LEVEL_MESSAGE | G_LOG_LEVEL_INFO | G_LOG_LEVEL_DEBUG);
+	g_log_set_handler(NULL, log_level, log_handler, NULL);
+	g_log_set_handler("cusbfx2", log_level, log_handler, NULL);
+	g_log_set_handler("capsts", log_level, log_handler, NULL);
 
 	cusbfx2_init();
 
