@@ -120,51 +120,6 @@ transfer_bcas_cb(gpointer data, gint length, gpointer user_data)
 }
 
 
-static void
-adjust_tuner_channel(cusbfx2_handle *device)
-{
-	switch (st_source) {
-	case 0:
-		capsts_ir_cmd_append(IR_CMD_DIGITAL_TERESTRIAL1);
-		break;
-	case 1:
-		capsts_ir_cmd_append(IR_CMD_FORMAT_BS);
-		break;
-	case 2:
-		capsts_ir_cmd_append(IR_CMD_FORMAT_CS);
-		break;
-	default:
-		break;
-	}
-
-	if (st_long_channel && st_source != 0) {
-		capsts_ir_cmd_append(IR_CMD_3DIGIT_INPUT);
-		if (strlen(st_long_channel) == 3) {
-			const gchar *p;
-			for (p = st_long_channel; p; ++p) {
-				gint digit = g_ascii_digit_value(*p);
-				if (digit < 0) {
-					digit = 0;
-				}
-				capsts_ir_cmd_append(IR_CMD_0 + digit);
-			}
-		}
-	} else {
-		if (st_channel >= 1 && st_channel <= 9) {
-			capsts_ir_cmd_append(IR_CMD_0 + st_channel);
-		} else if (st_channel == 10) {
-			capsts_ir_cmd_append(IR_CMD_0);
-		} else if (st_channel >= 11 && st_channel <= 12) {
-			capsts_ir_cmd_append(IR_CMD_11 + (st_channel - 11));
-		}
-	}
-
-	if (st_source >= 0 || st_channel >= 0 || st_long_channel) {
-		capsts_ir_cmd_send(device);
-		g_usleep(2500 * 1000);
-	}
-}
-
 static gboolean
 init_b25(void)
 {
@@ -232,7 +187,7 @@ rec(void)
 	capsts_exec_cmd(CMD_IFCONFIG, 0xE3);
 	capsts_exec_cmd_queue(device);
 
-	adjust_tuner_channel(device);
+	capsts_adjust_tuner_channel(device, st_source, st_channel, st_long_channel);
 
 	if (st_ts_filename) {
 		io_ts = g_io_channel_new_file(st_ts_filename, "w", &error);

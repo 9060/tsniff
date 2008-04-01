@@ -82,7 +82,7 @@ enum {
 	PIO_TS_BACK	= 0x04,
 };
 
-enum {
+typedef enum CapStsIrCommand {
 	IR_CMD_POWER_TOGGLE		= 0x048A,
 	IR_CMD_POWER_ON			= 0x048B,
 	IR_CMD_POWER_OFF		= 0x048C,
@@ -126,8 +126,15 @@ enum {
 	IR_CMD_GREEN			= 0x04CA,
 	IR_CMD_YELLOW			= 0x04CB,
 	IR_CMD_PROGRAM_INFO		= 0x04CC,
-};
+} CapStsIrCommand;
 
+/** チューナーの入力ソース  */
+typedef enum CapStsTunerSource {
+	TUNER_SOURCE_TERESTRIAL = 0, /* 地上波 */
+	TUNER_SOURCE_BS,			/* BS */
+	TUNER_SOURCE_CS,			/* CS */
+	TUNER_SOURCE_MAX
+} CapStsTunerSource;
 
 void
 capsts_exec_cmd(guint8 cmd, ...);
@@ -135,13 +142,18 @@ capsts_exec_cmd(guint8 cmd, ...);
 void
 capsts_exec_cmd_queue(cusbfx2_handle *device);
 
+/* IR Interfaces
+   -------------------------------------------------------------------------- */
 void
 capsts_set_ir_base(gint base);
 
 void
-capsts_ir_cmd_append(guint16 cmd);
+capsts_ir_cmd_append(CapStsIrCommand cmd);
 
-void
+gboolean
 capsts_ir_cmd_send(cusbfx2_handle *device);
+
+gboolean
+capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, gint channel, const gchar *three_channel);
 
 #endif	/* CAPSTS_H_INCLUDED */

@@ -1,3 +1,4 @@
+#include <string.h>
 #include <stdarg.h>
 #include <glib.h>
 #include "cusbfx2.h"
@@ -77,49 +78,131 @@ capsts_exec_cmd_queue(cusbfx2_handle *device)
 	st_cmd_queue = NULL;
 }
 
+/**
+ * IRのベースチャンネルを変更する。
+ * デフォルトは 1 。
+ * @param base	ベースチャンネル(1〜3)
+ */
 void
 capsts_set_ir_base(gint base)
 {
 	st_ir_base = (CLAMP(base, 1, 3) - 1) * 0x80;
 }
 
+/**
+ * IRコマンド送信キューに新規コマンドを追加する。
+ *
+ * @param cmd	追加するコマンド
+ */
 void
-capsts_ir_cmd_append(guint16 cmd)
+capsts_ir_cmd_append(CapStsIrCommand cmd)
 {
+	/* まだキューが無ければ作成 */
     if (!st_ir_cmd_queue) {
-		st_ir_cmd_queue = g_array_new(TRUE, TRUE, sizeof(guint16));
+		st_ir_cmd_queue = g_array_new(TRUE, TRUE, sizeof(CapStsIrCommand));
     }
 
 	g_array_append_val(st_ir_cmd_queue, cmd);
 }
 
-void
+/**
+ * IRコマンド送信キューを実際に送信する。
+ *
+ * @param device
+ */
+gboolean
 capsts_ir_cmd_send(cusbfx2_handle *device)
 {
 	guint i;
 	guint8 cmds[3] = { CMD_IR_CODE };
 
-	g_assert(st_ir_cmd_queue);
-
 	for (i = 0; i < st_ir_cmd_queue->len; ++i) {
-		guint16 cmd = g_array_index(st_ir_cmd_queue, guint16, i);
+		guint16 cmd = g_array_index(st_ir_cmd_queue, CapStsIrCommand, i);
 
 		if (cmd == IR_CMD_3DIGIT_INPUT) {
 			// wait == 300msec needed ?
 		}
 
+		/* コマンドの信号を立ち上げる */
 		cmds[1] = (cmd + st_ir_base) & 0xFF;
 		cmds[2] = ((cmd + st_ir_base) >> 8) & 0xFF;
-		cusbfx2_bulk_transfer(device, ENDPOINT_CMD_OUT, cmds, 3);
+		if (cusbfx2_bulk_transfer(device, ENDPOINT_CMD_OUT, cmds, 3) != 3) {
+			g_warning("Couldn't send IR command");
+			return FALSE;
+		}
 
 		g_usleep(600 * 1000);
 
+		/* コマンドの信号を立ち下げる */
 		cmds[1] = cmds[2] = 0;
-		cusbfx2_bulk_transfer(device, ENDPOINT_CMD_OUT, cmds, 3);
+		if (cusbfx2_bulk_transfer(device, ENDPOINT_CMD_OUT, cmds, 3) != 3) {
+			g_warning("Couldn't send IR command");
+			return FALSE;
+		}
 
 		g_usleep(100 * 1000);
 	}
 
-	g_array_free(st_ir_cmd_queue, TRUE);
+	/* 送信したキューを削除 */
+	if (st_ir_cmd_queue) g_array_free(st_ir_cmd_queue, TRUE);
 	st_ir_cmd_queue = NULL;
+}
+
+/**
+ * チューナーの入力ソースとチャンネルを変更する。
+ *
+ * @param device
+ * @param source	入力ソース -- TUNER_SOURCE_MAX の場合は変更しない
+ * @param chnannel	1ボタンチャンネル(1〜12) -- 範囲外の場合は変更しない
+ * @param three_channel	3桁チャンネル(000〜999) -- BS/CSの場合のみ
+ */
+gboolean
+capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, gint channel, const gchar *three_channel)
+{
+	/* まず入力ソースを切り替える */
+	switch (source) {
+	case TUNER_SOURCE_TERESTRIAL:
+		capsts_ir_cmd_append(IR_CMD_DIGITAL_TERESTRIAL1);
+		break;
+	case TUNER_SOURCE_BS:
+		capsts_ir_cmd_append(IR_CMD_FORMAT_BS);
+		break;
+	case TUNER_SOURCE_CS:
+		capsts_ir_cmd_append(IR_CMD_FORMAT_CS);
+		break;
+	default:
+		/* 現在の入力ソースのまま切り替えない */
+		break;
+	}
+
+	/* 入力がBS/CSかつ3桁チャンネルが指定されていれば、3桁チャンネル入力によってチャンネルを変更 */
+	if (three_channel && source != TUNER_SOURCE_TERESTRIAL) {
+		capsts_ir_cmd_append(IR_CMD_3DIGIT_INPUT);
+
+		if (strlen(three_channel) != 3) {
+			g_critical("Invalid channel format (must be three digit)");
+			if (st_ir_cmd_queue) g_array_free(st_ir_cmd_queue, TRUE);
+			return FALSE;
+		} else {
+			const gchar *p;
+			for (p = three_channel; *p; ++p) {
+				capsts_ir_cmd_append(IR_CMD_0 + CLAMP(g_ascii_digit_value(*p), 0, 9));
+			}
+		}
+	} else if (channel >= 1 && channel <= 12) {
+		/* 通常のチャンネルが指定されていれば、変更 */
+		static CapStsIrCommand cmd[] = { IR_CMD_1, IR_CMD_2, IR_CMD_3, IR_CMD_4, IR_CMD_5, IR_CMD_6,
+										 IR_CMD_7, IR_CMD_8, IR_CMD_9, IR_CMD_0, IR_CMD_11, IR_CMD_12 };
+		capsts_ir_cmd_append(cmd[CLAMP(channel, 1, 12) - 1]);
+	}
+
+	if (st_ir_cmd_queue->len > 0) {
+		if (!capsts_ir_cmd_send(device)) {
+			if (st_ir_cmd_queue) g_array_free(st_ir_cmd_queue, TRUE);
+			return FALSE;
+		}
+
+		/* チューナー側での切り替えを待つ */
+		g_usleep(2500 * 1000);
+	}
 }
