@@ -317,7 +317,7 @@ log_handler(const gchar *log_domain, GLogLevelFlags log_level, const gchar *mess
 	else if (log_level & G_LOG_LEVEL_DEBUG) level = "DEBUG";
 	else level = "";
 
-	g_fprintf(stderr, "%s,%03d %s [%s] %s\n", asctime, now.tv_usec / 1000, level, log_domain ? log_domain : "", message);
+	g_fprintf(stderr, "%s,%03d %s %s\n", asctime, now.tv_usec / 1000, level, message);
 }
 
 int
