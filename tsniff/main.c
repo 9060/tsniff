@@ -15,10 +15,14 @@ static gboolean st_fx2_is_force_load = FALSE; /* CUSBFX2のファームウェア
 static gint st_fx2_ts_buffer_size = 16384;
 static gint st_fx2_ts_buffer_count = 16;
 static GOptionEntry st_fx2_options[] = {
-	{ "fx2-id", 0, 0, G_OPTION_ARG_INT, &st_fx2_id, "Find CUSBFX2 it has ID N [0]", "N" },
-	{ "fx2-force-load", 0, 0, G_OPTION_ARG_NONE, &st_fx2_is_force_load, "Force load the firmware [disabled]", NULL },
-	{ "fx2-ts-buffer-size", 0, 0, G_OPTION_ARG_INT, &st_fx2_ts_buffer_size, "Set TS transfer buffer size to N bytes [16384]", "N" },
-	{ "fx2-ts-buffer-count", 0, 0, G_OPTION_ARG_INT, &st_fx2_ts_buffer_size, "Set TS transfer buffer count to N [16]", "N" },
+	{ "fx2-id", 0, 0, G_OPTION_ARG_INT, &st_fx2_id,
+	  "Find CUSBFX2 it has ID N [0]", "N" },
+	{ "fx2-force-load", 0, 0, G_OPTION_ARG_NONE, &st_fx2_is_force_load,
+	  "Force load the firmware [disabled]", NULL },
+	{ "fx2-ts-buffer-size", 0, 0, G_OPTION_ARG_INT, &st_fx2_ts_buffer_size,
+	  "Set TS transfer buffer size to N bytes [16384]", "N" },
+	{ "fx2-ts-buffer-count", 0, 0, G_OPTION_ARG_INT, &st_fx2_ts_buffer_size,
+	  "Set TS transfer buffer count to N [16]", "N" },
 	{ NULL }
 };
 
@@ -27,10 +31,14 @@ static gint st_ir_source = -1;
 static gint st_ir_channel = -1;
 static gchar *st_ir_three_channel = NULL;
 static GOptionEntry st_ir_options[] = {
-	{ "ir-base", 0, 0, G_OPTION_ARG_INT, &st_ir_base, "Set IR base channel to N (1..3) [1]", "N" },
-	{ "ir-source", 's', 0, G_OPTION_ARG_INT, &st_ir_source, "Set tuner source to N (0:Terestrial 1:BS 2:CS)", "N" },
-	{ "ir-channel", 'c', 0, G_OPTION_ARG_INT, &st_ir_channel, "Set tuner channel to C (1..12)", "C" },
-	{ "ir-three-channel", '3', 0, G_OPTION_ARG_STRING, &st_ir_three_channel, "Set tuner channel to CCC (BS/CS only)", "CCC" },
+	{ "ir-base", 0, 0, G_OPTION_ARG_INT, &st_ir_base,
+	  "Set IR base channel to N (1..3) [1]", "N" },
+	{ "ir-source", 's', 0, G_OPTION_ARG_INT, &st_ir_source,
+	  "Set tuner source to N (0:Terestrial 1:BS 2:CS)", "N" },
+	{ "ir-channel", 'c', 0, G_OPTION_ARG_INT, &st_ir_channel,
+	  "Set tuner channel to C (1..12)", "C" },
+	{ "ir-three-channel", '3', 0, G_OPTION_ARG_STRING, &st_ir_three_channel,
+	  "Set tuner channel to CCC (BS/CS only)", "CCC" },
 	{ NULL }
 };
 
@@ -39,19 +47,24 @@ static gint st_b25_round = 4;
 static gboolean st_b25_strip = FALSE;
 static gint st_b25_bcas_queue_size = 256;
 static GOptionEntry st_b25_options[] = {
-	{ "b25-enable", 'B', 0, G_OPTION_ARG_NONE, &st_b25_is_enabled, "Enable B25 decoder [disabled]", NULL },
-	{ "b25-round", 0, 0, G_OPTION_ARG_INT, &st_b25_round, "Set MULTI-2 round factor to N [4]", "N" },
-	{ "b25-strip", 'S', 0, G_OPTION_ARG_NONE, &st_b25_strip, "Discard NULL packets from output [disabled]", NULL },
+	{ "b25-enable", 'B', 0, G_OPTION_ARG_NONE, &st_b25_is_enabled,
+	  "Enable B25 decoder [disabled]", NULL },
+	{ "b25-round", 0, 0, G_OPTION_ARG_INT, &st_b25_round,
+	  "Set MULTI-2 round factor to N [4]", "N" },
+	{ "b25-strip", 'S', 0, G_OPTION_ARG_NONE, &st_b25_strip,
+	  "Discard NULL packets from output [disabled]", NULL },
 	{ "b25-bcas-queue-size", 0, 0, G_OPTION_ARG_INT, &st_b25_bcas_queue_size,
-	  "Set ECM buffer capacity to N on pseudo B-CAS reader [256]", "N" },
+	  "Set ECM buffer capacity of pseudo B-CAS reader to N [256]", "N" },
 	{ NULL }
 };
 
 static gchar *st_ts_filename = NULL;
 static gchar *st_bcas_filename = NULL;
 static GOptionEntry st_main_options[] = {
-	{ "ts-filename", 't', 0, G_OPTION_ARG_FILENAME, &st_ts_filename, "Output MPEG2-TS to FILENAME", "FILENAME" },
-	{ "bcas-filename", 'b', 0, G_OPTION_ARG_FILENAME, &st_bcas_filename, "Output B-CAS stream to FILENAME", "FILENAME" },
+	{ "ts-filename", 't', 0, G_OPTION_ARG_FILENAME, &st_ts_filename,
+	  "Output MPEG2-TS to FILENAME", "FILENAME" },
+	{ "bcas-filename", 'b', 0, G_OPTION_ARG_FILENAME, &st_bcas_filename,
+	  "Output B-CAS stream to FILENAME", "FILENAME" },
 	{ NULL }
 };
 
