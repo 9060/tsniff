@@ -18,7 +18,7 @@ void
 cusbfx2_exit(void);
 
 cusbfx2_handle *
-cusbfx2_open(guint8 id, guint8 *firmware, const gchar *firmware_id);
+cusbfx2_open(guint8 id, guint8 *firmware, const gchar *firmware_id, gboolean is_force_load);
 
 void
 cusbfx2_close(cusbfx2_handle *h);

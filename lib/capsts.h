@@ -136,6 +136,12 @@ typedef enum CapStsTunerSource {
 	TUNER_SOURCE_MAX
 } CapStsTunerSource;
 
+/* Global functions
+   ========================================================================== */
+
+cusbfx2_handle *
+capsts_open(gint fx2id, gboolean is_force_load);
+
 void
 capsts_cmd_push(guint8 cmd, ...);
 

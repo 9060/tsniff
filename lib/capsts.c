@@ -4,13 +4,38 @@
 #include "cusbfx2.h"
 #include "capsts.h"
 
-static GByteArray *st_cmd_queue = NULL; /* CAPSTS¥Õ¥¡¡¼¥à¥¦¥§¥¢¥³¥Ş¥ó¥É¤ÎÁ÷¿®¥­¥å¡¼ */
+/* CUSBFX2ã®CAPSTSãƒ•ã‚¡ãƒ¼ãƒ ã‚¦ã‚§ã‚¢ */
+static guint8 st_firmware[] =
+#include "fw.inc"
+#define FIRMWARE_ID "FX2_FIFO_ATTY01"
 
-static GArray *st_ir_cmd_queue = NULL; /* IR¥³¥Ş¥ó¥É¤ÎÁ÷¿®¥­¥å¡¼ */
-static gint st_ir_base = 0;		/** IR¤Î¥Ù¡¼¥¹¥Á¥ã¥ó¥Í¥ë */
+static GByteArray *st_cmd_queue = NULL; /* CAPSTSãƒ•ã‚¡ãƒ¼ãƒ ã‚¦ã‚§ã‚¢ã‚³ãƒãƒ³ãƒ‰ã®é€ä¿¡ã‚­ãƒ¥ãƒ¼ */
+
+static GArray *st_ir_cmd_queue = NULL; /* IRã‚³ãƒãƒ³ãƒ‰ã®é€ä¿¡ã‚­ãƒ¥ãƒ¼ */
+static gint st_ir_base = 0;		/** IRã®ãƒ™ãƒ¼ã‚¹ãƒãƒ£ãƒ³ãƒãƒ« */
 
 /**
- * CAPSTS¥Õ¥¡¡¼¥à¥¦¥§¥¢¤Ø¤Î¥³¥Ş¥ó¥É¤ò¥­¥å¡¼¤ËÄÉ²Ã¤¹¤ë¡£
+ * CUSBFX2ã‚’é–‹ã„ã¦ãƒãƒ³ãƒ‰ãƒ«ã‚’è¿”ã™ã€‚
+ *
+ * å¿…è¦ãªãƒ•ã‚¡ãƒ¼ãƒ ã‚¦ã‚§ã‚¢ãŒCUSBFX2ã«ãƒ­ãƒ¼ãƒ‰ã•ã‚Œã¦ã„ãªã‘ã‚Œã°ã€
+ * ãƒ•ã‚¡ãƒ¼ãƒ ã‚¦ã‚§ã‚¢ã‚’ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã—ãŸå¾Œã€å†æ¤œå‡ºã—ãŸ CUSBFX2 ã®ãƒãƒ³ãƒ‰ãƒ«ã‚’è¿”ã™ã€‚
+ *
+ * @param[in]	fx2id	é–‹ãCUSBFX2ã®ID
+ * @param[in]	is_force_load	TRUEãªã‚‰å¼·åˆ¶çš„ã«ãƒ•ã‚¡ãƒ¼ãƒ ã‚¦ã‚§ã‚¢ã‚’ãƒ­ãƒ¼ãƒ‰ã™ã‚‹
+ */
+cusbfx2_handle *
+capsts_open(gint fx2id, gboolean is_force_load)
+{
+	cusbfx2_handle *device;
+	device = cusbfx2_open(fx2id, st_firmware, FIRMWARE_ID, is_force_load);
+	if (!device) {
+		g_critical("Couldn't open CUSBFX2 device");
+	}
+	return device;
+}
+
+/**
+ * CAPSTSãƒ•ã‚¡ãƒ¼ãƒ ã‚¦ã‚§ã‚¢ã¸ã®ã‚³ãƒãƒ³ãƒ‰ã‚’ã‚­ãƒ¥ãƒ¼ã«è¿½åŠ ã™ã‚‹ã€‚
  */
 void
 capsts_cmd_push(guint8 cmd, ...)
@@ -71,7 +96,7 @@ capsts_cmd_push(guint8 cmd, ...)
 }
 
 /**
- * CAPSTS¥Õ¥¡¡¼¥à¥¦¥§¥¢¤Ø¤Î¥³¥Ş¥ó¥É¥­¥å¡¼¤ò¼Âºİ¤ËÁ÷¿®¤¹¤ë¡£
+ * CAPSTSãƒ•ã‚¡ãƒ¼ãƒ ã‚¦ã‚§ã‚¢ã¸ã®ã‚³ãƒãƒ³ãƒ‰ã‚­ãƒ¥ãƒ¼ã‚’å®Ÿéš›ã«é€ä¿¡ã™ã‚‹ã€‚
  */
 gboolean
 capsts_cmd_commit(cusbfx2_handle *device)
@@ -92,9 +117,9 @@ capsts_cmd_commit(cusbfx2_handle *device)
 }
 
 /**
- * IR¤Î¥Ù¡¼¥¹¥Á¥ã¥ó¥Í¥ë¤òÊÑ¹¹¤¹¤ë¡£
- * ¥Ç¥Õ¥©¥ë¥È¤Ï 1 ¡£
- * @param base	¥Ù¡¼¥¹¥Á¥ã¥ó¥Í¥ë(1¡Á3)
+ * IRã®ãƒ™ãƒ¼ã‚¹ãƒãƒ£ãƒ³ãƒãƒ«ã‚’å¤‰æ›´ã™ã‚‹ã€‚
+ * ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã¯ 1 ã€‚
+ * @param base	ãƒ™ãƒ¼ã‚¹ãƒãƒ£ãƒ³ãƒãƒ«(1ã€œ3)
  */
 void
 capsts_set_ir_base(gint base)
@@ -103,14 +128,14 @@ capsts_set_ir_base(gint base)
 }
 
 /**
- * IR¥³¥Ş¥ó¥ÉÁ÷¿®¥­¥å¡¼¤Ë¿·µ¬¥³¥Ş¥ó¥É¤òÄÉ²Ã¤¹¤ë¡£
+ * IRã‚³ãƒãƒ³ãƒ‰é€ä¿¡ã‚­ãƒ¥ãƒ¼ã«æ–°è¦ã‚³ãƒãƒ³ãƒ‰ã‚’è¿½åŠ ã™ã‚‹ã€‚
  *
- * @param cmd	ÄÉ²Ã¤¹¤ë¥³¥Ş¥ó¥É
+ * @param cmd	è¿½åŠ ã™ã‚‹ã‚³ãƒãƒ³ãƒ‰
  */
 void
 capsts_ir_cmd_push(CapStsIrCommand cmd)
 {
-	/* ¤Ş¤À¥­¥å¡¼¤¬Ìµ¤±¤ì¤ĞºîÀ® */
+	/* ã¾ã ã‚­ãƒ¥ãƒ¼ãŒç„¡ã‘ã‚Œã°ä½œæˆ */
     if (!st_ir_cmd_queue) {
 		st_ir_cmd_queue = g_array_new(TRUE, TRUE, sizeof(CapStsIrCommand));
     }
@@ -119,7 +144,7 @@ capsts_ir_cmd_push(CapStsIrCommand cmd)
 }
 
 /**
- * IR¥³¥Ş¥ó¥ÉÁ÷¿®¥­¥å¡¼¤ò¼Âºİ¤ËÁ÷¿®¤¹¤ë¡£
+ * IRã‚³ãƒãƒ³ãƒ‰é€ä¿¡ã‚­ãƒ¥ãƒ¼ã‚’å®Ÿéš›ã«é€ä¿¡ã™ã‚‹ã€‚
  *
  * @param device
  */
@@ -136,7 +161,7 @@ capsts_ir_cmd_commit(cusbfx2_handle *device)
 			// wait == 300msec needed ?
 		}
 
-		/* ¥³¥Ş¥ó¥É¤Î¿®¹æ¤òÎ©¤Á¾å¤²¤ë */
+		/* ã‚³ãƒãƒ³ãƒ‰ã®ä¿¡å·ã‚’ç«‹ã¡ä¸Šã’ã‚‹ */
 		cmds[1] = (cmd + st_ir_base) & 0xFF;
 		cmds[2] = ((cmd + st_ir_base) >> 8) & 0xFF;
 		if (cusbfx2_bulk_transfer(device, ENDPOINT_CMD_OUT, cmds, 3) != 3) {
@@ -146,7 +171,7 @@ capsts_ir_cmd_commit(cusbfx2_handle *device)
 
 		g_usleep(600 * 1000);
 
-		/* ¥³¥Ş¥ó¥É¤Î¿®¹æ¤òÎ©¤Á²¼¤²¤ë */
+		/* ã‚³ãƒãƒ³ãƒ‰ã®ä¿¡å·ã‚’ç«‹ã¡ä¸‹ã’ã‚‹ */
 		cmds[1] = cmds[2] = 0;
 		if (cusbfx2_bulk_transfer(device, ENDPOINT_CMD_OUT, cmds, 3) != 3) {
 			g_warning("Couldn't send IR command");
@@ -156,23 +181,23 @@ capsts_ir_cmd_commit(cusbfx2_handle *device)
 		g_usleep(100 * 1000);
 	}
 
-	/* Á÷¿®¤·¤¿¥­¥å¡¼¤òºï½ü */
+	/* é€ä¿¡ã—ãŸã‚­ãƒ¥ãƒ¼ã‚’å‰Šé™¤ */
 	if (st_ir_cmd_queue) g_array_free(st_ir_cmd_queue, TRUE);
 	st_ir_cmd_queue = NULL;
 }
 
 /**
- * ¥Á¥å¡¼¥Ê¡¼¤ÎÆşÎÏ¥½¡¼¥¹¤È¥Á¥ã¥ó¥Í¥ë¤òÊÑ¹¹¤¹¤ë¡£
+ * ãƒãƒ¥ãƒ¼ãƒŠãƒ¼ã®å…¥åŠ›ã‚½ãƒ¼ã‚¹ã¨ãƒãƒ£ãƒ³ãƒãƒ«ã‚’å¤‰æ›´ã™ã‚‹ã€‚
  *
  * @param device
- * @param source	ÆşÎÏ¥½¡¼¥¹ -- TUNER_SOURCE_MAX ¤Î¾ì¹ç¤ÏÊÑ¹¹¤·¤Ê¤¤
- * @param chnannel	1¥Ü¥¿¥ó¥Á¥ã¥ó¥Í¥ë(1¡Á12) -- ÈÏ°Ï³°¤Î¾ì¹ç¤ÏÊÑ¹¹¤·¤Ê¤¤
- * @param three_channel	3·å¥Á¥ã¥ó¥Í¥ë(000¡Á999) -- BS/CS¤Î¾ì¹ç¤Î¤ß
+ * @param source	å…¥åŠ›ã‚½ãƒ¼ã‚¹ -- TUNER_SOURCE_MAX ã®å ´åˆã¯å¤‰æ›´ã—ãªã„
+ * @param chnannel	1ãƒœã‚¿ãƒ³ãƒãƒ£ãƒ³ãƒãƒ«(1ã€œ12) -- ç¯„å›²å¤–ã®å ´åˆã¯å¤‰æ›´ã—ãªã„
+ * @param three_channel	3æ¡ãƒãƒ£ãƒ³ãƒãƒ«(000ã€œ999) -- BS/CSã®å ´åˆã®ã¿
  */
 gboolean
 capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, gint channel, const gchar *three_channel)
 {
-	/* ¤Ş¤ºÆşÎÏ¥½¡¼¥¹¤òÀÚ¤êÂØ¤¨¤ë */
+	/* ã¾ãšå…¥åŠ›ã‚½ãƒ¼ã‚¹ã‚’åˆ‡ã‚Šæ›¿ãˆã‚‹ */
 	switch (source) {
 	case TUNER_SOURCE_TERESTRIAL:
 		capsts_ir_cmd_push(IR_CMD_DIGITAL_TERESTRIAL1);
@@ -184,11 +209,11 @@ capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, gi
 		capsts_ir_cmd_push(IR_CMD_FORMAT_CS);
 		break;
 	default:
-		/* ¸½ºß¤ÎÆşÎÏ¥½¡¼¥¹¤Î¤Ş¤ŞÀÚ¤êÂØ¤¨¤Ê¤¤ */
+		/* ç¾åœ¨ã®å…¥åŠ›ã‚½ãƒ¼ã‚¹ã®ã¾ã¾åˆ‡ã‚Šæ›¿ãˆãªã„ */
 		break;
 	}
 
-	/* ÆşÎÏ¤¬BS/CS¤«¤Ä3·å¥Á¥ã¥ó¥Í¥ë¤¬»ØÄê¤µ¤ì¤Æ¤¤¤ì¤Ğ¡¢3·å¥Á¥ã¥ó¥Í¥ëÆşÎÏ¤Ë¤è¤Ã¤Æ¥Á¥ã¥ó¥Í¥ë¤òÊÑ¹¹ */
+	/* å…¥åŠ›ãŒBS/CSã‹ã¤3æ¡ãƒãƒ£ãƒ³ãƒãƒ«ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚Œã°ã€3æ¡ãƒãƒ£ãƒ³ãƒãƒ«å…¥åŠ›ã«ã‚ˆã£ã¦ãƒãƒ£ãƒ³ãƒãƒ«ã‚’å¤‰æ›´ */
 	if (three_channel && source != TUNER_SOURCE_TERESTRIAL) {
 		capsts_ir_cmd_push(IR_CMD_3DIGIT_INPUT);
 
@@ -203,7 +228,7 @@ capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, gi
 			}
 		}
 	} else if (channel >= 1 && channel <= 12) {
-		/* ÄÌ¾ï¤Î¥Á¥ã¥ó¥Í¥ë¤¬»ØÄê¤µ¤ì¤Æ¤¤¤ì¤Ğ¡¢ÊÑ¹¹ */
+		/* é€šå¸¸ã®ãƒãƒ£ãƒ³ãƒãƒ«ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚Œã°ã€å¤‰æ›´ */
 		static CapStsIrCommand cmd[] = { IR_CMD_1, IR_CMD_2, IR_CMD_3, IR_CMD_4, IR_CMD_5, IR_CMD_6,
 										 IR_CMD_7, IR_CMD_8, IR_CMD_9, IR_CMD_0, IR_CMD_11, IR_CMD_12 };
 		capsts_ir_cmd_push(cmd[CLAMP(channel, 1, 12) - 1]);
@@ -215,7 +240,7 @@ capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, gi
 			return FALSE;
 		}
 
-		/* ¥Á¥å¡¼¥Ê¡¼Â¦¤Ç¤ÎÀÚ¤êÂØ¤¨¤òÂÔ¤Ä */
+		/* ãƒãƒ¥ãƒ¼ãƒŠãƒ¼å´ã§ã®åˆ‡ã‚Šæ›¿ãˆã‚’å¾…ã¤ */
 		g_usleep(2500 * 1000);
 	}
 }

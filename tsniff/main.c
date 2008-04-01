@@ -6,10 +6,6 @@
 #include "b_cas_card.h"
 #include "bcas_card_streaming.h"
 
-static guint8 st_firmware[] =
-#include "fw.inc"
-
-
 /* Options
    -------------------------------------------------------------------------- */
 static gint st_fx2id = 0;
@@ -176,9 +172,8 @@ rec(void)
 	g_message("capsts_set_ir_base: %d", st_ir_base);
 	capsts_set_ir_base(st_ir_base);
 
-	device = cusbfx2_open(st_fx2id, st_firmware, "FX2_FIFO_ATTY01");
+	device = capsts_open(st_fx2id, FALSE);
 	if (!device) {
-		g_critical("Couldn't open CUSBFX2 device");
 		return;
 	}
 

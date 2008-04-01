@@ -191,13 +191,14 @@ cusbfx2_exit(void)
  *
  * @a firmware が NULL であれば、ファームウェアのロードを行いません。
  *
- * @param id FX2のID
- * @param firmware ファームウェア
- * @param firmware_id ファームウェアのID
+ * @param[in]	id	FX2のID
+ * @param[in]	firmware	ファームウェア
+ * @param[in]	firmware_id	ファームウェアのID
+ * @param[in]	is_force_load	TRUEなら強制的にファームウェアをロードする
  * @return handle
  */
 cusbfx2_handle *
-cusbfx2_open(guint8 id, guint8 *firmware, const gchar *firmware_id)
+cusbfx2_open(guint8 id, guint8 *firmware, const gchar *firmware_id, gboolean is_force_load)
 {
 #define CUSBFX2_REOPEN_RETRY_MAX 10
 #define CUSBFX2_REOPEN_RETRY_WAIT (500 * 1000)
@@ -217,7 +218,7 @@ cusbfx2_open(guint8 id, guint8 *firmware, const gchar *firmware_id)
 		gchar *manufacturer;
 
 		manufacturer = cusbfx2_get_manufacturer(usb_handle);
-		if (!strcmp(manufacturer, firmware_id)) {
+		if (!is_force_load && !strcmp(manufacturer, firmware_id)) {
 			g_message("Firmware <%s> already loaded", manufacturer);
 			g_free(manufacturer);
 		} else {
