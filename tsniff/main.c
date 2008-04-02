@@ -264,11 +264,19 @@ rec(void)
 	timer = g_timer_new();
 	while (st_is_running) {
 		cusbfx2_poll();
+		g_fprintf(stderr, "Now:%.3f TS:%d\r", g_timer_elapsed(timer, NULL), st_b25_queue_size);
 		if (g_timer_elapsed(timer, NULL) > 60.0) {
 			break;
 		}
 	}
+	g_fprintf(stderr, "\n");
 	g_timer_destroy(timer);
+
+	if (st_is_running) {
+		g_message("### FINISHED SHUTDOWN ###");
+	} else {
+		g_message("### INTERRUPTED SHUTDOWN ###");
+	}
 
 	if (st_ts_filename) capsts_cmd_push(CMD_EP6IN_STOP);
 	if (st_bcas_filename || st_b25_is_enabled) capsts_cmd_push(CMD_EP4IN_STOP);
@@ -278,8 +286,8 @@ rec(void)
  quit:
 	cusbfx2_free_transfer(transfer_ts);
 	cusbfx2_free_transfer(transfer_bcas);
-	g_io_channel_close(io_ts);
-	g_io_channel_close(io_bcas);
+	if (io_ts) g_io_channel_close(io_ts);
+	if (io_bcas) g_io_channel_close(io_bcas);
 	cusbfx2_close(device);
 }
 
