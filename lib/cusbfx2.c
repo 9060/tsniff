@@ -241,7 +241,7 @@ cusbfx2_open(guint8 id, guint8 *firmware, const gchar *firmware_id, gboolean is_
 			libusb_close(usb_handle);
 
 			for (i = 0; i < CUSBFX2_REENUM_RETRY_MAX; ++i) {
-				g_debug("[cusbfx2_open] re-enumerate try %s", i + 1);
+				g_debug("[cusbfx2_open] re-enumerate try %d", i + 1);
 				usb_handle = cusbfx2_find_open(id);
 				if (usb_handle)
 					break;
