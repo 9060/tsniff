@@ -253,7 +253,7 @@ rec(void)
 	if (st_bcas_filename || st_b25_is_enabled) {
 		g_message("Setup B-CAS transfer");
 		transfer_bcas = cusbfx2_init_bulk_transfer(device, "B-CAS", ENDPOINT_BCAS_IN,
-												   128, 1, transfer_bcas_cb, io_bcas);
+												   32, 1, transfer_bcas_cb, io_bcas);
 		if (!transfer_bcas) {
 			g_critical("Couldn't setup B-CAS transfer");
 			goto quit;

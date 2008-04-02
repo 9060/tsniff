@@ -33,11 +33,11 @@ static GString *
 hexdump(guint8 *data, guint len, gboolean is_seperate)
 {
 	GString *result;
-	guint8 *p;
+	guint i;
 
 	result = g_string_sized_new(len * 3);
-	for (p = data; len + 1 > 0; ++p, --len) {
-		g_string_append_printf(result, "%s%02x", ((p == data || !is_seperate) ? "" : " "), *p);
+	for (i = 0; i < len; ++i) {
+		g_string_append_printf(result, "%s%02x", ((i == 0 || !is_seperate) ? "" : " "), data[i]);
 	}
 	return result;
 }
@@ -51,7 +51,7 @@ bcas_stream_sync(BCASStream *self)
 
 	/* バッファ長が絶対にパケットとして成立しない長さだと同期は取れない */
 	if (self->raw_stream->len < PACKET_MIN_SIZE) {
-		g_debug("[bcas_stream_sync] not enough stream (len=%d, MIN=%d) at 0x%08x",
+		g_debug("[bcas_stream_sync] not enough stream (len=%d, MIN=%d) at %u",
 				self->raw_stream->len, PACKET_MIN_SIZE, self->pos);
 		return FALSE;
 	}
@@ -72,19 +72,19 @@ bcas_stream_sync(BCASStream *self)
 		/* ストリーム先頭の中途半端なパケットを削る */
 		if (skip_size > 0) {
 			GString *dump = hexdump(self->raw_stream->data, skip_size, TRUE);
-			g_debug("[bcas_stream_sync] dump skipped [%s]", dump->str);
+			g_debug("[bcas_stream_sync] skip %d bytes and dump [%s]", skip_size, dump->str);
 			g_string_free(dump, TRUE);
 			self->raw_stream = g_byte_array_remove_range(self->raw_stream, 0, skip_size);
 		}
 
 		/* パケットサイズ分のデータが残っていなければまだ同期完了にしない */
 		if (left_size < PACKET_HEADER_SIZE + p[PACKET_LEN_INDEX] + 1/* header + payload + checksum */) {
-			g_debug("[bcas_stream_sync] not enough stream (expect %d bytes but left %d bytes) at 0x%08x",
+			g_debug("[bcas_stream_sync] not enough stream (expect %d bytes but left %d bytes) at %u",
 					p[PACKET_LEN_INDEX] + 1, left_size, self->pos);
 			is_synced = FALSE;
 		}
 		if (is_synced)
-			g_message("[bcas_stream_sync] synced with %d bytes skipped at 0x%08x", skip_size, self->pos);
+			g_message("[bcas_stream_sync] synced with %d bytes skipped at %u", skip_size, self->pos);
 	}
 
 	return is_synced;
@@ -98,6 +98,7 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 	guint8 *p = self->raw_stream->data;
 	guint left_size = self->raw_stream->len;
 	guint parsed_size = 0;
+	guint parsed_packets = 0;
 
 	for (;;) {
 		gint i;
@@ -107,7 +108,7 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 		if (!self->is_synced) {
 			self->is_synced = bcas_stream_sync(self);
 			if (!self->is_synced) {
-				g_warning("[bcas_stream_parse] couldn't sync stream at 0x%08x", self->pos);
+				g_warning("[bcas_stream_parse] couldn't sync stream at %u", self->pos);
 				break;
 			}
 
@@ -119,11 +120,11 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 
 		/* 1パケット分のデータが残っていなければ終了 */
 		if (left_size < PACKET_MIN_SIZE) {
-			g_debug("[bcas_stream_parse] not enough stream (left=%d, expect=%d) at 0x%08x",
+			g_debug("[bcas_stream_parse] not enough stream (left=%d, expect=%d) at %u",
 					left_size, PACKET_MIN_SIZE, self->pos);
 			break;
-		} else if (left_size < p[PACKET_LEN_INDEX] + 1) {
-			g_debug("[bcas_stream_parse] not enough stream (left=%d, expect=%d) at 0x%08x",
+		} else if (left_size < PACKET_HEADER_SIZE + p[PACKET_LEN_INDEX] + 1) {
+			g_debug("[bcas_stream_parse] not enough stream (left=%d, expect=%d) at %u",
 					left_size, p[PACKET_LEN_INDEX] + 1, self->pos);
 			break;
 		}
@@ -139,7 +140,7 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 		if (x != checksum) {
 			guint strip_size;
 			GString *dump = hexdump(p, size, TRUE);
-			g_warning("[bcas_stream_prase] packet corrupted at 0x%08x [%s]", self->pos, dump->str);
+			g_warning("[bcas_stream_prase] packet corrupted at %u [%s]", self->pos, dump->str);
 			g_string_free(dump, TRUE);
 
 			/* 解析済みパケットを削る(現パケットがECMコマンドであればそれも削る) */
@@ -159,8 +160,10 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 		packet.header = (p[0] << 8) | p[1];
 		packet.len = p[2];
 		memcpy(packet.payload, &p[3], packet.len);
-		(*cbfn)(&packet, self->n_sync_packets == 1, user_data);
+		if (cbfn)
+			(*cbfn)(&packet, self->n_sync_packets == 1, user_data);
 
+		++parsed_packets;
 		p += size;
 		parsed_size += size;
 		left_size -= size;
@@ -171,7 +174,7 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 	if (parsed_size > 0) {
 		self->raw_stream = g_byte_array_remove_range(self->raw_stream, 0, parsed_size);
 	}
-	g_debug("[bcas_stream_prase] finished (left=%d)", self->raw_stream->len);
+	g_debug("[bcas_stream_prase] %d packets parsed (left=%d)", parsed_packets, self->raw_stream->len);
 }
 
 /* -------------------------------------------------------------------------- */
