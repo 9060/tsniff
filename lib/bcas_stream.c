@@ -51,8 +51,8 @@ bcas_stream_sync(BCASStream *self)
 
 	/* バッファ長が絶対にパケットとして成立しない長さだと同期は取れない */
 	if (self->raw_stream->len < PACKET_MIN_SIZE) {
-		g_debug("[bcas_stream_sync] not enough stream (len=%d, MIN=%d) at %u",
-				self->raw_stream->len, PACKET_MIN_SIZE, self->pos);
+/* 		g_debug("[bcas_stream_sync] not enough stream (len=%d, MIN=%d) at %u", */
+/* 				self->raw_stream->len, PACKET_MIN_SIZE, self->pos); */
 		return FALSE;
 	}
 
@@ -79,8 +79,8 @@ bcas_stream_sync(BCASStream *self)
 
 		/* パケットサイズ分のデータが残っていなければまだ同期完了にしない */
 		if (left_size < PACKET_HEADER_SIZE + p[PACKET_LEN_INDEX] + 1/* header + payload + checksum */) {
-			g_debug("[bcas_stream_sync] not enough stream (expect %d bytes but left %d bytes) at %u",
-					p[PACKET_LEN_INDEX] + 1, left_size, self->pos);
+/* 			g_debug("[bcas_stream_sync] not enough stream (expect %d bytes but left %d bytes) at %u", */
+/* 					p[PACKET_LEN_INDEX] + 1, left_size, self->pos); */
 			is_synced = FALSE;
 		}
 		if (is_synced)
@@ -120,12 +120,12 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 
 		/* 1パケット分のデータが残っていなければ終了 */
 		if (left_size < PACKET_MIN_SIZE) {
-			g_debug("[bcas_stream_parse] not enough stream (left=%d, expect=%d) at %u",
-					left_size, PACKET_MIN_SIZE, self->pos);
+/* 			g_debug("[bcas_stream_parse] not enough stream (left=%d, expect=%d) at %u", */
+/* 					left_size, PACKET_MIN_SIZE, self->pos); */
 			break;
 		} else if (left_size < PACKET_HEADER_SIZE + p[PACKET_LEN_INDEX] + 1) {
-			g_debug("[bcas_stream_parse] not enough stream (left=%d, expect=%d) at %u",
-					left_size, p[PACKET_LEN_INDEX] + 1, self->pos);
+/* 			g_debug("[bcas_stream_parse] not enough stream (left=%d, expect=%d) at %u", */
+/* 					left_size, p[PACKET_LEN_INDEX] + 1, self->pos); */
 			break;
 		}
 
