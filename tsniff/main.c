@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <signal.h>
 #include <glib.h>
 #include "cusbfx2.h"
 #include "capsts.h"
@@ -75,6 +76,7 @@ static GOptionEntry st_main_options[] = {
 };
 
 
+static gboolean st_is_running = TRUE;
 static ARIB_STD_B25 *st_b25 = NULL;
 static B_CAS_CARD *st_bcas = NULL;
 
@@ -260,7 +262,7 @@ rec(void)
 	capsts_cmd_commit(device);
 
 	timer = g_timer_new();
-	for (;;) {
+	while (st_is_running) {
 		cusbfx2_poll();
 		if (g_timer_elapsed(timer, NULL) > 60.0) {
 			break;
@@ -336,6 +338,12 @@ parse_options(int *argc, char ***argv)
 }
 
 static void
+sighandler(int signum)
+{
+	st_is_running = FALSE;
+}
+
+static void
 log_handler(const gchar *log_domain, GLogLevelFlags log_level, const gchar *message, gpointer user_data)
 {
 	gchar asctime[32];
@@ -343,36 +351,63 @@ log_handler(const gchar *log_domain, GLogLevelFlags log_level, const gchar *mess
 	const gchar *level;
 	struct tm now_tm;
 
+	switch (log_level) {
+	case G_LOG_LEVEL_ERROR:
+		level = "ERROR";
+		break;
+	case G_LOG_LEVEL_CRITICAL:
+		level = "FATAL";
+		break;
+	case G_LOG_LEVEL_WARNING:
+		level = "WARN ";
+		break;
+	case G_LOG_LEVEL_MESSAGE:
+	case G_LOG_LEVEL_INFO:
+		if (st_is_quiet) return;
+		level = "INFO ";
+		break;
+	case G_LOG_LEVEL_DEBUG:
+		if (!st_is_verbose) return;
+		level = "DEBUG";
+		break;
+	default:
+		level = "?????";
+	}
+
 	g_get_current_time(&now);
 	localtime_r(&now.tv_sec, &now_tm);
 	
 	strftime(asctime, sizeof(asctime), "%Y-%m-%d %H:%M:%S", &now_tm);
 
-	if (log_level & G_LOG_LEVEL_ERROR) level = "ERROR";
-	else if (log_level & G_LOG_LEVEL_CRITICAL) level = "CRITI";
-	else if (log_level & G_LOG_LEVEL_WARNING) level = "WARNI";
-	else if (log_level & G_LOG_LEVEL_MESSAGE) level = "INFO ";
-	else if (log_level & G_LOG_LEVEL_INFO) level = "INFO ";
-	else if (log_level & G_LOG_LEVEL_DEBUG) level = "DEBUG";
-	else level = "";
-
 	g_fprintf(stderr, "%s,%03d %s %s\n", asctime, now.tv_usec / 1000, level, message);
+}
+
+static void
+log_handler_null(const gchar *log_domain, GLogLevelFlags log_level, const gchar *message, gpointer user_data)
+{
 }
 
 int
 main(int argc, char **argv)
 {
-	GLogLevelFlags log_level = (G_LOG_LEVEL_MASK & ~G_LOG_LEVEL_DEBUG) | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION;
+	GLogLevelFlags log_level = G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION;
+	struct sigaction sigact;
 
 	if (!parse_options(&argc, &argv)) {
 		return 1;
 	}
 
-	if (st_is_verbose) log_level |= G_LOG_LEVEL_DEBUG;
-	if (st_is_quiet) log_level &= ~(G_LOG_LEVEL_MESSAGE | G_LOG_LEVEL_INFO | G_LOG_LEVEL_DEBUG);
 	g_log_set_handler(NULL, log_level, log_handler, NULL);
 	g_log_set_handler("cusbfx2", log_level, log_handler, NULL);
 	g_log_set_handler("capsts", log_level, log_handler, NULL);
+	g_log_set_handler("GLib", log_level, log_handler, NULL);
+
+	sigact.sa_handler = sighandler;
+	sigemptyset(&sigact.sa_mask);
+	sigact.sa_flags = 0;
+	sigaction(SIGINT, &sigact, NULL);
+	sigaction(SIGTERM, &sigact, NULL);
+	sigaction(SIGQUIT, &sigact, NULL);
 
 	cusbfx2_init();
 
