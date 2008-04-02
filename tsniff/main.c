@@ -151,7 +151,6 @@ transfer_bcas_cb(gpointer data, gint length, gpointer user_data)
 	gsize written;
 
 	if (st_bcas) {
-		g_debug("bcas_card_streaming_push: len=%d", length);
 		bcas_card_streaming_push(st_bcas, data, length);
 	}
 	if (io) {

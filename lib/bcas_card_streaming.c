@@ -58,7 +58,7 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 
 	/* ECM Response パケット待ちであれば破棄する */
 	if (is_first_sync && self->pending_ecm_packet) {
-		g_warning("parse_packet: dispose pending ECM request packet");
+		g_warning("[bcas_card_streaming] dispose pending ECM request packet");
 		g_slice_free(ECMPacket, self->pending_ecm_packet);
 		self->pending_ecm_packet = NULL;
 	}
@@ -69,7 +69,7 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 		/* ECM Request パケットであれば対応する ECM Response を待つ */
 		/* 既に Response を待っている? */
 		if (self->pending_ecm_packet) {
-			g_warning("parse_packet: found a new ECM request before completing old request (%d packets delta)",
+			g_warning("[bcas_card_streaming] found a new ECM request before completing old request (%d packets delta)",
 					  self->response_delay - 1);
 		} else {
 			self->pending_ecm_packet = g_slice_new(ECMPacket);
@@ -81,10 +81,10 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 	} else if (BCAS_IS_ECM_RESPONSE_PACKET(packet)) {
 		/* Request がないのに Response が来た */
 		if (!self->pending_ecm_packet) {
-			g_warning("parse_packet: not requested ECM response found");
+			g_warning("[bcas_card_streaming] not requested ECM response found");
 		} else {
 			if (self->response_delay > 1) {
-				g_warning("parse_packet: ECM response delayed by %d packets, maybe incorrect",
+				g_warning("[bcas_card_streaming] ECM response delayed by %d packets, maybe incorrect",
 						  self->response_delay - 1);
 			}
 			self->pending_ecm_packet->flag = 
@@ -92,7 +92,7 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 			memcpy(self->pending_ecm_packet->key, &packet->payload[BCAS_ECM_PACKET_KEY_INDEX], BCAS_ECM_PACKET_KEY_SIZE);
 
 			/* ECMキューに追加 */
-			g_debug("register new ECM [%s]", dump_ecm_packet(self->pending_ecm_packet));
+			g_debug("[bcas_card_streaming] ECM REGIST [%s]", dump_ecm_packet(self->pending_ecm_packet));
 			g_queue_push_tail(self->ecm_queue, self->pending_ecm_packet);
 			if (self->ecm_queue->length > self->ecm_queue_len) {
 				/* ECMキューの最大長を越えていたら、最も古い ECM を捨てる */
@@ -169,8 +169,6 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 	src_packet.len = len;
 	memcpy(src_packet.data, src, len);
 
-	g_debug("search ECM [%s]", dump_ecm_packet(&src_packet));
-
 	match = g_queue_find_custom(self->ecm_queue, &src_packet, compare_ecm_packet);
 	if (match) {
 		ecm = match->data;
@@ -179,10 +177,9 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 	if (ecm) {
 		memcpy(dst->scramble_key, ecm->key, BCAS_ECM_PACKET_KEY_SIZE);
 		dst->return_code = ecm->flag;
-		g_debug(" find  ECM [%s]", dump_ecm_packet(ecm));
+		g_debug("[bcas_card_streaming] ECM FOUND  [%s]", dump_ecm_packet(ecm));
 	} else {
-		/* not found */
-		g_debug("not found: %d", len);
+		g_debug("[bcas_card_streaming] ECM FAILED [%s]", dump_ecm_packet(&src_packet));
 		return -1;
 	}
 
