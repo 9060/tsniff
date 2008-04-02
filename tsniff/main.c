@@ -85,6 +85,7 @@ static B_CAS_CARD *st_bcas = NULL;
    -------------------------------------------------------------------------- */
 static GQueue *st_b25_queue = NULL;
 static gsize st_b25_queue_size = 0;
+static gsize st_b25_queue_max = 64*1024*1024;
 
 /* Callbacks
    -------------------------------------------------------------------------- */
@@ -107,7 +108,7 @@ transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 		g_queue_push_tail(st_b25_queue, chunk);
 		st_b25_queue_size += length;
 
-		while (st_b25_queue_size > 64*1024*1024) {
+		while (st_b25_queue_size > st_b25_queue_max) {
 			gpointer pop = g_queue_pop_head(st_b25_queue);
 			if (!pop) break;
 
@@ -265,9 +266,14 @@ rec(void)
 
 	timer = g_timer_new();
 	while (st_is_running) {
+		gdouble elapsed;
 		cusbfx2_poll();
-		g_fprintf(stderr, "Now:%.3f TS:%d\r", g_timer_elapsed(timer, NULL), st_b25_queue_size);
-		if (g_timer_elapsed(timer, NULL) > 60.0) {
+		elapsed = g_timer_elapsed(timer, NULL);
+		g_fprintf(stderr, "> Now:%.1f TS:%d(%3d%%)\r",
+				  elapsed,
+				  st_b25_queue_size,
+				  (gsize)((gdouble)st_b25_queue_size / st_b25_queue_max * 100));
+		if (elapsed > 60.0) {
 			break;
 		}
 	}

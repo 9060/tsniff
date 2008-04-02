@@ -24,7 +24,7 @@ typedef struct BCASStream BCASStream;
  * BCASパケット \p が ECM Response パケットであれば TRUE を返します。
  * @param p	BCASPacket
  */
-#define BCAS_IS_ECM_RESPONSE_PACKET(p)				\
+#define BCAS_IS_ECM_RESPONSE_PACKET(p)									\
 	(((p)->len == 0x19) && ((p)->payload[0] == 0x00) && ((p)->payload[1] == 0x15))
 
 #define BCAS_ECM_PACKET_DATA_LEN_INDEX 4

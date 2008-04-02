@@ -7,7 +7,8 @@
 struct BCASStream {
 	GByteArray *raw_stream;		/* 未解析のバイトストリーム */
 	gboolean is_synced;			/* ストリームの同期が取れているか? */
-	guint n_sync_packets;		/*  */
+	guint n_sync_packets;		/* 同期が取れている間に解析したパケット数 */
+	guint pos;			/* 解析中のインデックス */
 };
 
 
@@ -28,6 +29,19 @@ struct BCASStream {
 	 ((p)[PACKET_COMMAND_INDEX + 2] == 0x00) &&	\
 	 ((p)[PACKET_COMMAND_INDEX + 3] == 0x00))
 
+static GString *
+hexdump(guint8 *data, guint len, gboolean is_seperate)
+{
+	GString *result;
+	guint8 *p;
+
+	result = g_string_sized_new(len * 3);
+	for (p = data; len + 1 > 0; ++p, --len) {
+		g_string_append_printf(result, "%s%02x", ((p == data || !is_seperate) ? "" : " "), *p);
+	}
+	return result;
+}
+
 static gboolean
 bcas_stream_sync(BCASStream *self)
 {
@@ -37,7 +51,8 @@ bcas_stream_sync(BCASStream *self)
 
 	/* バッファ長が絶対にパケットとして成立しない長さだと同期は取れない */
 	if (self->raw_stream->len < PACKET_MIN_SIZE) {
-		g_warning("bcas_stream_sync: not enough stream");
+		g_debug("[bcas_stream_sync] not enough stream (len=%d, MIN=%d) at 0x%08x",
+				self->raw_stream->len, PACKET_MIN_SIZE, self->pos);
 		return FALSE;
 	}
 
@@ -52,19 +67,24 @@ bcas_stream_sync(BCASStream *self)
 	}
 
 	if (is_synced) {
-		g_message("bcas_stream_sync: synced (skip %d bytes)", skip_size);
+		self->pos += skip_size;
 
 		/* ストリーム先頭の中途半端なパケットを削る */
 		if (skip_size > 0) {
+			GString *dump = hexdump(self->raw_stream->data, skip_size, TRUE);
+			g_debug("[bcas_stream_sync] dump skipped [%s]", dump->str);
+			g_string_free(dump, TRUE);
 			self->raw_stream = g_byte_array_remove_range(self->raw_stream, 0, skip_size);
 		}
 
 		/* パケットサイズ分のデータが残っていなければまだ同期完了にしない */
 		if (left_size < PACKET_HEADER_SIZE + p[PACKET_LEN_INDEX] + 1/* header + payload + checksum */) {
-			g_warning("bcas_stream_sync: not enough stream (expect %d bytes but left %d bytes)",
-					  p[PACKET_LEN_INDEX] + 1, left_size);
+			g_debug("[bcas_stream_sync] not enough stream (expect %d bytes but left %d bytes) at 0x%08x",
+					p[PACKET_LEN_INDEX] + 1, left_size, self->pos);
 			is_synced = FALSE;
 		}
+		if (is_synced)
+			g_message("[bcas_stream_sync] synced with %d bytes skipped at 0x%08x", skip_size, self->pos);
 	}
 
 	return is_synced;
@@ -87,7 +107,7 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 		if (!self->is_synced) {
 			self->is_synced = bcas_stream_sync(self);
 			if (!self->is_synced) {
-				g_warning("bcas_stream_parse: couldn't sync stream");
+				g_warning("[bcas_stream_parse] couldn't sync stream at 0x%08x", self->pos);
 				break;
 			}
 
@@ -98,8 +118,13 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 		}
 
 		/* 1パケット分のデータが残っていなければ終了 */
-		if (left_size < PACKET_MIN_SIZE || left_size < p[PACKET_LEN_INDEX] + 1) {
-			//g_warning("bcas_stream_parse: not enough stream");
+		if (left_size < PACKET_MIN_SIZE) {
+			g_debug("[bcas_stream_parse] not enough stream (left=%d, expect=%d) at 0x%08x",
+					left_size, PACKET_MIN_SIZE, self->pos);
+			break;
+		} else if (left_size < p[PACKET_LEN_INDEX] + 1) {
+			g_debug("[bcas_stream_parse] not enough stream (left=%d, expect=%d) at 0x%08x",
+					left_size, p[PACKET_LEN_INDEX] + 1, self->pos);
 			break;
 		}
 
@@ -112,11 +137,17 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 
 		/* チェックサムが一致しなければ再同期 */
 		if (x != checksum) {
-			g_warning("bcas_stream_prase: broken packet");
+			guint strip_size;
+			GString *dump = hexdump(p, size, TRUE);
+			g_warning("[bcas_stream_prase] packet corrupted at 0x%08x [%s]", self->pos, dump->str);
+			g_string_free(dump, TRUE);
 
 			/* 解析済みパケットを削る(現パケットがECMコマンドであればそれも削る) */
-			self->raw_stream = g_byte_array_remove_range(self->raw_stream, 0,
-														 parsed_size + (IS_ECM_REQUEST(p) ? PACKET_COMMAND_INDEX + 4 : 0));
+			strip_size = parsed_size + (IS_ECM_REQUEST(p) ? PACKET_COMMAND_INDEX + 4 : 0);
+			if (strip_size > 0) {
+				self->raw_stream = g_byte_array_remove_range(self->raw_stream, 0, strip_size);
+			}
+			self->pos += strip_size;
 
 			self->is_synced = FALSE;
 			continue;
@@ -133,7 +164,14 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 		p += size;
 		parsed_size += size;
 		left_size -= size;
+		self->pos += size;
 	}
+
+	/* 解析の終わったストリームを削る */
+	if (parsed_size > 0) {
+		self->raw_stream = g_byte_array_remove_range(self->raw_stream, 0, parsed_size);
+	}
+	g_debug("[bcas_stream_prase] finished (left=%d)", self->raw_stream->len);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -146,6 +184,7 @@ bcas_stream_new(void)
 	self->raw_stream = g_byte_array_new();
 	self->is_synced = FALSE;
 	self->n_sync_packets = 0;
+	self->pos = 0;
 
 	return self;
 }
@@ -177,8 +216,7 @@ bcas_stream_push(BCASStream *self, guint8 *data, uint len, BCASStreamCallbackFun
 
 	request_packet {  # big endian and packed
 		header {
-			guint8 head1 = 0x00;
-			guint8 head2 = 0x40;
+			guint16 header = 0x0000 or 0x0040;
 			guint8 len = sizeof(payload);
 		}
 		payload {
@@ -191,12 +229,11 @@ bcas_stream_push(BCASStream *self, guint8 *data, uint len, BCASStreamCallbackFun
 
 	response_packet {	# always lead by request_packet
 		header {
-			guint8 head1 = 0x00;
-			guint8 head2 = 0x40;
+			guint16 header = request_packet.header.header;
 			guint8 len = sizeof(payload);
 		}
 		payload {
-			guint32 commnad = 0x00150000; # 未確認
+			guint32 commnad = 0x00150000;
 			guint16 flag; # 0x0200 = Payment-deferred PPV / 0x0400 = Prepaid PPV / 0x0800 = Tier
 			guint8 KSo_odd[8];
 			guint8 KSo_even[8];
@@ -204,36 +241,6 @@ bcas_stream_push(BCASStream *self, guint8 *data, uint len, BCASStreamCallbackFun
 			guint8 unknown2;
 			guint8 unknown3;
 		}
+		guint8 checksum;	# XOR-ed packet bytes
 	};
-
-
-00000000  00 40 24
-          90 34 00 00 command
-          1e data_len
-          00 1e 01 fe cc a0 87 95 -
-00000010  be 5b 1a f4 ea b3 70 b4  d4 e4 81 b4 2e 62 c3 31 -
-00000020  38 99 42 e0 b3 85 00
-          59
-
-          00 40 19
-          00 15 00 00
-          08 -
-00000030  00
-          af e2 83 4f 9c 79 c0  d9 10 4c b4 36 e6 70 a3
-00000040  8f
-          01 90 00
-          cc
-
-          00 00 07
-          90 80 00 00 01 00 00
-          16
-
-00000050  00 00 14
-          00 10 00 00 a1  01 00 00 00 00 00 00 00
-00000060  00 00 00 00 00 90 00
-          34
-
-          00 40 24
-          90 34 00 00 1e
-00000070  00 1e 01 e3 bd 95 79 38  65 8b 90 19 11 c4 87 6e
  */
