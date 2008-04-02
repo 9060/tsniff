@@ -7,7 +7,7 @@
 #include "capsts.h"
 #include "arib_std_b25.h"
 #include "b_cas_card.h"
-#include "bcas_card_streaming.h"
+#include "pseudo_bcas.h"
 #include "bcas_stream.h"
 
 /* Options
@@ -177,7 +177,7 @@ init_b25(void)
 	st_b25->set_strip(st_b25, 0);
 
 	g_message("Initializing B-CAS card reader emulator");
-	st_bcas = (B_CAS_CARD *)bcas_card_streaming_new();
+	st_bcas = (B_CAS_CARD *)pseudo_bcas_new();
 	if (!st_bcas) {
 		g_critical("couldn't create B-CAS card reader");
 		return FALSE;

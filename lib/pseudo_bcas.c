@@ -6,7 +6,7 @@
 #include "b_cas_card.h"
 #include "b_cas_card_error_code.h"
 #include "bcas_stream.h"
-#include "bcas_card_streaming.h"
+#include "pseudo_bcas.h"
 
 static B_CAS_INIT_STATUS st_bcas_init_status = {
 	{ 0x36,0x31,0x04,0x66,0x4B,0x17,0xEA,0x5C,0x32,0xDF,0x9C,0xF5,0xC4,0xC3,0x6C,0x1B,
@@ -56,7 +56,7 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 
 	/* ECM Response パケット待ちであれば破棄する */
 	if (is_first_sync && self->pending_ecm_packet) {
-		g_warning("[bcas_card_streaming] dispose pending ECM request packet");
+		g_warning("[pseudo_bcas] dispose pending ECM request packet");
 		g_slice_free(ECMPacket, self->pending_ecm_packet);
 		self->pending_ecm_packet = NULL;
 	}
@@ -67,7 +67,7 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 		/* ECM Request パケットであれば対応する ECM Response を待つ */
 		/* 既に Response を待っている? */
 		if (self->pending_ecm_packet) {
-			g_warning("[bcas_card_streaming] found a new ECM request before completing old request (%d packets delta)",
+			g_warning("[pseudo_bcas] found a new ECM request before completing old request (%d packets delta)",
 					  self->response_delay);
 		} else {
 			self->pending_ecm_packet = g_slice_new(ECMPacket);
@@ -79,11 +79,11 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 	} else if (BCAS_IS_ECM_RESPONSE_PACKET(packet)) {
 		/* Request がないのに Response が来た */
 		if (!self->pending_ecm_packet) {
-			g_warning("[bcas_card_streaming] not requested ECM response found");
+			g_warning("[pseudo_bcas] not requested ECM response found");
 		} else {
 			GString *ecm_dump;
 			if (self->response_delay > 1) {
-				g_warning("[bcas_card_streaming] ECM response delayed by %d packets, maybe incorrect",
+				g_warning("[pseudo_bcas] ECM response delayed by %d packets, maybe incorrect",
 						  self->response_delay);
 			}
 			self->pending_ecm_packet->flag = 
@@ -92,7 +92,7 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 
 			/* ECMキューに追加 */
 			ecm_dump = hexdump(self->pending_ecm_packet->data, self->pending_ecm_packet->len, FALSE);
-			g_debug("[bcas_card_streaming] ECM regist  [%s]", ecm_dump->str);
+			g_debug("[pseudo_bcas] ECM regist  [%s]", ecm_dump->str);
 			g_string_free(ecm_dump, TRUE);
 
 			g_queue_push_tail(self->ecm_queue, self->pending_ecm_packet);
@@ -128,7 +128,7 @@ init_b_cas_card(void *bcas)
 {
 	Context *self;
 
-	g_message("[bcas_card_streaming] initialize");
+	g_message("[pseudo_bcas] initialize");
 	self = g_new(Context, 1);
 	((B_CAS_CARD *)bcas)->private_data = self;
 	self->ecm_queue = g_queue_new();
@@ -146,7 +146,7 @@ release_b_cas_card(void *bcas)
 	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
 	gpointer ecm;
 
-	g_message("[bcas_card_streaming] release");
+	g_message("[pseudo_bcas] release");
 
 	bcas_stream_free(self->stream);
 
@@ -160,7 +160,7 @@ release_b_cas_card(void *bcas)
 
 static int get_init_status_b_cas_card(void *bcas, B_CAS_INIT_STATUS *stat)
 {
-	g_message("[bcas_card_streaming] get initial status");
+	g_message("[pseudo_bcas] get initial status");
 	memcpy(stat, &st_bcas_init_status, sizeof(B_CAS_INIT_STATUS));
 	return 0;
 }
@@ -188,11 +188,11 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 		dst->return_code = ecm->flag;
 
 		ecm_dump = hexdump(ecm->data, ecm->len, FALSE);
-		g_debug("[bcas_card_streaming] ECM found  [%s]", ecm_dump->str);
+		g_debug("[pseudo_bcas] ECM found  [%s]", ecm_dump->str);
 		g_string_free(ecm_dump, TRUE);
 	} else {
 		ecm_dump = hexdump(src_packet.data, src_packet.len, FALSE);
-		g_warning("[bcas_card_streaming] ECM FAILED [%s]", ecm_dump->str);
+		g_warning("[pseudo_bcas] ECM FAILED [%s]", ecm_dump->str);
 		g_string_free(ecm_dump, TRUE);
 		return -1;
 	}
@@ -201,14 +201,14 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 }
 
 static void
-bcas_card_streaming_set_queue_len(void *bcas, guint len)
+set_queue_len(void *bcas, guint len)
 {
 	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
 	self->ecm_queue_len = len;
 }
 
 static void
-bcas_card_streaming_push(void *bcas, guint8 *data, guint len)
+push(void *bcas, guint8 *data, guint len)
 {
 	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
 	bcas_stream_push(self->stream, data, len, parse_packet, self);
@@ -218,7 +218,7 @@ bcas_card_streaming_push(void *bcas, guint8 *data, guint len)
  global function implementation
  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 PSEUDO_B_CAS_CARD *
-bcas_card_streaming_new(void)
+pseudo_bcas_new(void)
 {
 	PSEUDO_B_CAS_CARD *r;
 
@@ -229,8 +229,8 @@ bcas_card_streaming_new(void)
 	r->super.get_init_status = get_init_status_b_cas_card;
 	r->super.proc_ecm = proc_ecm_b_cas_card;
 
-	r->push = bcas_card_streaming_push;
-	r->set_queue_len = bcas_card_streaming_set_queue_len;
+	r->push = push;
+	r->set_queue_len = set_queue_len;
 
 	return r;
 }
