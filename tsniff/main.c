@@ -8,9 +8,13 @@
 #include "arib_std_b25.h"
 #include "b_cas_card.h"
 #include "bcas_card_streaming.h"
+#include "bcas_stream.h"
 
 /* Options
    -------------------------------------------------------------------------- */
+//#define OPTION_FLAG_DEBUG G_OPTION_FLAG_HIDDEN
+#define OPTION_FLAG_DEBUG 0
+
 static gint st_fx2_id = 0;		/* CUSBFX2のID */
 static gboolean st_fx2_is_force_load = FALSE; /* CUSBFX2のファームウェアを強制的にロードする */
 static gint st_fx2_ts_buffer_size = 16384;
@@ -63,6 +67,7 @@ static gchar *st_ts_filename = NULL;
 static gchar *st_bcas_filename = NULL;
 static gboolean st_is_verbose = FALSE;
 static gboolean st_is_quiet = FALSE;
+static gint st_verify_bcas_stream = -1;
 static GOptionEntry st_main_options[] = {
 	{ "ts-filename", 't', 0, G_OPTION_ARG_FILENAME, &st_ts_filename,
 	  "Output MPEG2-TS to FILENAME", "FILENAME" },
@@ -72,6 +77,8 @@ static GOptionEntry st_main_options[] = {
 	  "Verbose messages [disabled]", NULL },
 	{ "quiet", 'q', 0, G_OPTION_ARG_NONE, &st_is_quiet,
 	  "Quiet messages [disabled]", NULL },
+	{ "verify-bcas-stream", 0, OPTION_FLAG_DEBUG, G_OPTION_ARG_INT, &st_verify_bcas_stream,
+	  "Verify B-CAS stream CHUNK_SIZE=N", "N" },
 	{ NULL }
 };
 
@@ -207,6 +214,8 @@ rec(void)
 		}
 	}
 
+	cusbfx2_init();
+
 	g_message("capsts_set_ir_base: %d", st_ir_base);
 	capsts_set_ir_base(st_ir_base);
 
@@ -273,7 +282,7 @@ rec(void)
 				  elapsed,
 				  st_b25_queue_size,
 				  (gsize)((gdouble)st_b25_queue_size / st_b25_queue_max * 100));
-		if (elapsed > 60.0) {
+		if (elapsed > 180.0) {
 			break;
 		}
 	}
@@ -297,6 +306,45 @@ rec(void)
 	if (io_ts) g_io_channel_close(io_ts);
 	if (io_bcas) g_io_channel_close(io_bcas);
 	cusbfx2_close(device);
+	cusbfx2_exit();
+}
+
+/**
+ * --verify-bcas-stream=N と --bcas-filename=FILENAME が指定されて場合に実行される。
+ *
+ * B-CASストリームを --bcas-filename で指定されたファイルから読み取る。
+ * ストリームは --verify-bcas-stream=N で指定されたサイズで分割されつつ、
+ * パーザに送られる。
+ * パーザでエラーが出なければおけ。
+ */
+static void
+verify_bcas_stream(void)
+{
+	guint8 *buf;
+	gsize readed;
+	GIOChannel *io_bcas = NULL;
+	GError *error = NULL;
+	BCASStream *bcas_stream = NULL;
+	gint chunk_size = st_verify_bcas_stream;
+
+	g_message("*** Verify B-CAS Stream ***");
+
+	buf = g_malloc(chunk_size);
+	io_bcas = g_io_channel_new_file(st_bcas_filename, "r", &error);
+	if (!io_bcas) {
+			return;
+	}
+	g_io_channel_set_encoding(io_bcas, NULL, &error);
+	bcas_stream = bcas_stream_new();
+	while (g_io_channel_read_chars(io_bcas, buf, chunk_size, &readed, &error) == G_IO_STATUS_NORMAL) {
+		bcas_stream_push(bcas_stream, buf, readed, NULL, NULL);
+	}
+
+	g_free(buf);
+	bcas_stream_free(bcas_stream);
+	g_io_channel_close(io_bcas);
+	
+	return;
 }
 
 static gboolean
@@ -425,11 +473,11 @@ main(int argc, char **argv)
 	sigaction(SIGTERM, &sigact, NULL);
 	sigaction(SIGQUIT, &sigact, NULL);
 
-	cusbfx2_init();
-
-	rec();
-
-	cusbfx2_exit();
+	if (st_verify_bcas_stream > 0 && st_bcas_filename) {
+		verify_bcas_stream();
+	} else {
+		rec();
+	}
 
 	return 0;
 }
