@@ -92,7 +92,7 @@ static B_CAS_CARD *st_bcas = NULL;
    -------------------------------------------------------------------------- */
 static GQueue *st_b25_queue = NULL;
 static gsize st_b25_queue_size = 0;
-static gsize st_b25_queue_max = 64*1024*1024;
+static gsize st_b25_queue_max = 32*1024*1024;
 
 /* Callbacks
    -------------------------------------------------------------------------- */
