@@ -140,7 +140,7 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 		if (x != checksum) {
 			guint strip_size;
 			GString *dump = hexdump(p, size, TRUE);
-			g_warning("[bcas_stream_prase] packet corrupted at %u [%s]", self->pos, dump->str);
+			g_warning("[bcas_stream_parse] packet corrupted at %u [%s]", self->pos, dump->str);
 			g_string_free(dump, TRUE);
 
 			/* 解析済みパケットを削る(現パケットがECMコマンドであればそれも削る) */
@@ -174,7 +174,7 @@ bcas_stream_parse(BCASStream *self, BCASStreamCallbackFunc cbfn, gpointer user_d
 	if (parsed_size > 0) {
 		self->raw_stream = g_byte_array_remove_range(self->raw_stream, 0, parsed_size);
 	}
-	g_debug("[bcas_stream_prase] %d packets parsed (left=%d)", parsed_packets, self->raw_stream->len);
+	g_debug("[bcas_stream_parse] %d packets parsed (left=%d)", parsed_packets, self->raw_stream->len);
 }
 
 /* -------------------------------------------------------------------------- */
