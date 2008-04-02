@@ -120,7 +120,7 @@ transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 			if (!pop) break;
 
 			buffer.size = *(gsize *)pop;
-			buffer.data = ((gsize *)pop) + 1;
+			buffer.data = (gpointer)(((gsize *)pop) + 1);
 			ret = st_b25->put(st_b25, &buffer);
 			if (ret < 0) {
 				g_critical("b25->put %d", ret);
@@ -151,7 +151,7 @@ transfer_bcas_cb(gpointer data, gint length, gpointer user_data)
 	gsize written;
 
 	if (st_bcas) {
-		bcas_card_streaming_push(st_bcas, data, length);
+		((PSEUDO_B_CAS_CARD *)st_bcas)->push(st_bcas, data, length);
 	}
 	if (io) {
 		g_io_channel_write_chars(io, data, length, &written, &error);
@@ -177,7 +177,7 @@ init_b25(void)
 	st_b25->set_strip(st_b25, 0);
 
 	g_message("Initializing B-CAS card reader emulator");
-	st_bcas = bcas_card_streaming_new();
+	st_bcas = (B_CAS_CARD *)bcas_card_streaming_new();
 	if (!st_bcas) {
 		g_critical("couldn't create B-CAS card reader");
 		return FALSE;
@@ -188,7 +188,7 @@ init_b25(void)
 	}
 
 	g_message("Set B-CAS ECM buffer queue length to %d", st_b25_bcas_queue_size);
-	bcas_card_streaming_set_queue_len(st_bcas, st_b25_bcas_queue_size);
+	((PSEUDO_B_CAS_CARD *)st_bcas)->set_queue_len(st_bcas, st_b25_bcas_queue_size);
 
 	st_b25->set_b_cas_card(st_b25, st_bcas);
 

@@ -36,19 +36,17 @@ typedef struct Context {
 } Context;
 
 
-static gchar *
-dump_ecm_packet(ECMPacket *ecm)
+static GString *
+hexdump(guint8 *data, guint len, gboolean is_seperate)
 {
-	static gchar hexdump[2 * G_MAXUINT8 + 1];
-	gint i;
+	GString *result;
+	guint i;
 
-	hexdump[0] = '\0';
-	for (i = 0; i < ecm->len; ++i) {
-		gchar x[3];
-		g_sprintf(x, "%02x", ecm->data[i]);
-		g_strlcat(hexdump, x, 2 * G_MAXUINT8);
+	result = g_string_sized_new(len * 3);
+	for (i = 0; i < len; ++i) {
+		g_string_append_printf(result, "%s%02x", ((i == 0 || !is_seperate) ? "" : " "), data[i]);
 	}
-	return hexdump;
+	return result;
 }
 
 static void
@@ -70,7 +68,7 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 		/* 既に Response を待っている? */
 		if (self->pending_ecm_packet) {
 			g_warning("[bcas_card_streaming] found a new ECM request before completing old request (%d packets delta)",
-					  self->response_delay - 1);
+					  self->response_delay);
 		} else {
 			self->pending_ecm_packet = g_slice_new(ECMPacket);
 		}
@@ -83,16 +81,20 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 		if (!self->pending_ecm_packet) {
 			g_warning("[bcas_card_streaming] not requested ECM response found");
 		} else {
+			GString *ecm_dump;
 			if (self->response_delay > 1) {
 				g_warning("[bcas_card_streaming] ECM response delayed by %d packets, maybe incorrect",
-						  self->response_delay - 1);
+						  self->response_delay);
 			}
 			self->pending_ecm_packet->flag = 
 				(packet->payload[BCAS_ECM_PACKET_FLAGS_INDEX] << 8) | packet->payload[BCAS_ECM_PACKET_FLAGS_INDEX + 1];
 			memcpy(self->pending_ecm_packet->key, &packet->payload[BCAS_ECM_PACKET_KEY_INDEX], BCAS_ECM_PACKET_KEY_SIZE);
 
 			/* ECMキューに追加 */
-			g_debug("[bcas_card_streaming] ECM REGIST [%s]", dump_ecm_packet(self->pending_ecm_packet));
+			ecm_dump = hexdump(self->pending_ecm_packet->data, self->pending_ecm_packet->len, FALSE);
+			g_debug("[bcas_card_streaming] ECM regist  [%s]", ecm_dump->str);
+			g_string_free(ecm_dump, TRUE);
+
 			g_queue_push_tail(self->ecm_queue, self->pending_ecm_packet);
 			if (self->ecm_queue->length > self->ecm_queue_len) {
 				/* ECMキューの最大長を越えていたら、最も古い ECM を捨てる */
@@ -124,7 +126,10 @@ compare_ecm_packet(gconstpointer plhs, gconstpointer prhs)
 static int
 init_b_cas_card(void *bcas)
 {
-	Context *self = g_new(Context, 1);
+	Context *self;
+
+	g_message("[bcas_card_streaming] initialize");
+	self = g_new(Context, 1);
 	((B_CAS_CARD *)bcas)->private_data = self;
 	self->ecm_queue = g_queue_new();
 	self->ecm_queue_len = 128;
@@ -141,6 +146,8 @@ release_b_cas_card(void *bcas)
 	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
 	gpointer ecm;
 
+	g_message("[bcas_card_streaming] release");
+
 	bcas_stream_free(self->stream);
 
 	while (ecm = g_queue_pop_head(self->ecm_queue)) {
@@ -153,6 +160,7 @@ release_b_cas_card(void *bcas)
 
 static int get_init_status_b_cas_card(void *bcas, B_CAS_INIT_STATUS *stat)
 {
+	g_message("[bcas_card_streaming] get initial status");
 	memcpy(stat, &st_bcas_init_status, sizeof(B_CAS_INIT_STATUS));
 	return 0;
 }
@@ -164,6 +172,7 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 	ECMPacket src_packet;
 	GList *match;
 	ECMPacket *ecm = NULL;
+	GString *ecm_dump;
 
 	/* ECMキューからECMパケットを検索 */
 	src_packet.len = len;
@@ -177,44 +186,52 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 	if (ecm) {
 		memcpy(dst->scramble_key, ecm->key, BCAS_ECM_PACKET_KEY_SIZE);
 		dst->return_code = ecm->flag;
-		g_debug("[bcas_card_streaming] ECM FOUND  [%s]", dump_ecm_packet(ecm));
+
+		ecm_dump = hexdump(ecm->data, ecm->len, FALSE);
+		g_debug("[bcas_card_streaming] ECM found  [%s]", ecm_dump->str);
+		g_string_free(ecm_dump, TRUE);
 	} else {
-		g_debug("[bcas_card_streaming] ECM FAILED [%s]", dump_ecm_packet(&src_packet));
+		ecm_dump = hexdump(src_packet.data, src_packet.len, FALSE);
+		g_warning("[bcas_card_streaming] ECM FAILED [%s]", ecm_dump->str);
+		g_string_free(ecm_dump, TRUE);
 		return -1;
 	}
 
 	return 0;
 }
 
-
-/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- global function implementation
- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-B_CAS_CARD *
-bcas_card_streaming_new(void)
-{
-	B_CAS_CARD *r;
-
-	r = g_new(B_CAS_CARD, 1);
-
-	r->release = release_b_cas_card;
-	r->init = init_b_cas_card;
-	r->get_init_status = get_init_status_b_cas_card;
-	r->proc_ecm = proc_ecm_b_cas_card;
-
-	return r;
-}
-
-void
-bcas_card_streaming_set_queue_len(B_CAS_CARD *bcas, guint len)
+static void
+bcas_card_streaming_set_queue_len(void *bcas, guint len)
 {
 	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
 	self->ecm_queue_len = len;
 }
 
-void
-bcas_card_streaming_push(B_CAS_CARD *bcas, guint8 *data, guint len)
+static void
+bcas_card_streaming_push(void *bcas, guint8 *data, guint len)
 {
 	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
 	bcas_stream_push(self->stream, data, len, parse_packet, self);
 }
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ global function implementation
+ ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+PSEUDO_B_CAS_CARD *
+bcas_card_streaming_new(void)
+{
+	PSEUDO_B_CAS_CARD *r;
+
+	r = g_new(PSEUDO_B_CAS_CARD, 1);
+
+	r->super.release = release_b_cas_card;
+	r->super.init = init_b_cas_card;
+	r->super.get_init_status = get_init_status_b_cas_card;
+	r->super.proc_ecm = proc_ecm_b_cas_card;
+
+	r->push = bcas_card_streaming_push;
+	r->set_queue_len = bcas_card_streaming_set_queue_len;
+
+	return r;
+}
+
