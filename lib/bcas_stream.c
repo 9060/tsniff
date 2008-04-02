@@ -57,7 +57,7 @@ bcas_stream_sync(BCASStream *self)
 	}
 
 	/* ECMコマンドが現われる場所を探す */
-	left_size = self->raw_stream->len - PACKET_HEADER_SIZE + 4;
+	left_size = self->raw_stream->len - (PACKET_HEADER_SIZE + 4);
 	skip_size = 0;
 	for (p = self->raw_stream->data; left_size > 0; ++p, ++skip_size, --left_size) {
 		if (IS_ECM_REQUEST(p)) {
