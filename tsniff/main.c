@@ -88,7 +88,7 @@ static gsize st_b25_queue_size = 0;
 
 /* Callbacks
    -------------------------------------------------------------------------- */
-static void
+static gboolean
 transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 {
 	GIOChannel *io = (GIOChannel *)user_data;
@@ -132,9 +132,10 @@ transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 	} else if (io) {
 		g_io_channel_write_chars(io, data, length, &written, &error);
 	}
+	return TRUE;
 }
 
-static void
+static gboolean
 transfer_bcas_cb(gpointer data, gint length, gpointer user_data)
 {
 	GIOChannel *io = (GIOChannel *)user_data;
@@ -148,6 +149,7 @@ transfer_bcas_cb(gpointer data, gint length, gpointer user_data)
 	if (io) {
 		g_io_channel_write_chars(io, data, length, &written, &error);
 	}
+	return TRUE;
 }
 
 

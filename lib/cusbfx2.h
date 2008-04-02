@@ -8,7 +8,7 @@ typedef struct cusbfx2_handle cusbfx2_handle;
 struct cusbfx2_transfer;
 typedef struct cusbfx2_transfer cusbfx2_transfer;
 
-typedef void (*cusbfx2_transfer_cb_fn)(gpointer buf, gint length, gpointer user_data);
+typedef gboolean (*cusbfx2_transfer_cb_fn)(gpointer buf, gint length, gpointer user_data);
 
 
 gint
