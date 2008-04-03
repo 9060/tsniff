@@ -94,6 +94,43 @@ static GQueue *st_b25_queue = NULL;
 static gsize st_b25_queue_size = 0;
 static gsize st_b25_queue_max = 32*1024*1024;
 
+
+/* Signal handler
+   -------------------------------------------------------------------------- */
+static guint st_installed_sighandler = 0;
+struct sigaction st_old_sigaction_sigint;
+struct sigaction st_old_sigaction_sigterm;
+struct sigaction st_old_sigaction_sigquit;
+
+static void
+sighandler(int signum)
+{
+	st_is_running = FALSE;
+}
+
+static void
+install_sighandler(void)
+{
+	struct sigaction sigact;
+
+	sigact.sa_handler = sighandler;
+	sigemptyset(&sigact.sa_mask);
+	sigact.sa_flags = 0;
+
+	if (sigaction(SIGINT, &sigact, &st_old_sigaction_sigint) == 0) st_installed_sighandler |= 1;
+	if (sigaction(SIGTERM, &sigact, &st_old_sigaction_sigterm) == 0) st_installed_sighandler |= 2;
+	if (sigaction(SIGQUIT, &sigact, &st_old_sigaction_sigquit) == 0) st_installed_sighandler |= 4;
+}
+
+static void
+restore_sighandler(void)
+{
+	if (st_installed_sighandler & 1) sigaction(SIGINT, &st_old_sigaction_sigint, NULL);
+	if (st_installed_sighandler & 2) sigaction(SIGTERM, &st_old_sigaction_sigterm, NULL);
+	if (st_installed_sighandler & 4) sigaction(SIGQUIT, &st_old_sigaction_sigquit, NULL);
+}
+
+
 /* Callbacks
    -------------------------------------------------------------------------- */
 static gboolean
@@ -213,6 +250,8 @@ rec(void)
 		}
 	}
 
+	install_sighandler();
+
 	cusbfx2_init();
 
 	g_message("capsts_set_ir_base: %d", st_ir_base);
@@ -300,6 +339,8 @@ rec(void)
 	capsts_cmd_commit(device);
 
  quit:
+	restore_sighandler();
+
 	cusbfx2_free_transfer(transfer_ts);
 	cusbfx2_free_transfer(transfer_bcas);
 	if (io_ts) g_io_channel_close(io_ts);
@@ -401,12 +442,6 @@ parse_options(int *argc, char ***argv)
 }
 
 static void
-sighandler(int signum)
-{
-	st_is_running = FALSE;
-}
-
-static void
 log_handler(const gchar *log_domain, GLogLevelFlags log_level, const gchar *message, gpointer user_data)
 {
 	gchar asctime[32];
@@ -454,7 +489,6 @@ int
 main(int argc, char **argv)
 {
 	GLogLevelFlags log_level = G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION;
-	struct sigaction sigact;
 
 	if (!parse_options(&argc, &argv)) {
 		return 1;
@@ -464,13 +498,6 @@ main(int argc, char **argv)
 	g_log_set_handler("cusbfx2", log_level, log_handler, NULL);
 	g_log_set_handler("capsts", log_level, log_handler, NULL);
 	g_log_set_handler("GLib", log_level, log_handler, NULL);
-
-	sigact.sa_handler = sighandler;
-	sigemptyset(&sigact.sa_mask);
-	sigact.sa_flags = 0;
-	sigaction(SIGINT, &sigact, NULL);
-	sigaction(SIGTERM, &sigact, NULL);
-	sigaction(SIGQUIT, &sigact, NULL);
 
 	if (st_verify_bcas_stream > 0 && st_bcas_filename) {
 		verify_bcas_stream();
