@@ -18,15 +18,50 @@ INSTALL
  $ wget "http://projects.reactivated.net/cgi-bin/gitweb.cgi?p=libusb.git;a=snapshot;h=0499e9f418607b5786ac0c3e97bc46737a609ca3;sf=tgz"
 
 
+USAGE
+=====
+
+B-CAS 初期データ
+----------------
+
+--enable-b25 を指定し、かつ B-CAS のデータソースとして CUSBFX2 やファイルを使用する場合は、
+B-CAS 初期データ(システム鍵・初期 CBC)を明示的に指定する必要があります。
+これは、カードリーダがなければ B-CAS 初期データを取得できないことからくる制限事項です。
+
+B-CAS 初期データは、オプションで指定するか、設定ファイルに書いておきます。
+
+ $ tsniff --b25-system-key=00112233445566778899AABBCCDDEEFF00112233445566778899aabbccddeeff \
+     --b25-init-cbc=0011223344556677 --enable-b25
+
+ tsniff.conf ::
+   [b25]
+   system_key = 00112233445566778899AABBCCDDEEFF00112233445566778899aabbccddeeff
+   init_cbc = 0011223344556677
+
+なお、B-CAS 初期データは以下の手順で取得できます。
+
+ $ tsniff --b25-dump-init-status >$HOME/.config/tsniff.conf
+
+# 最初に初期データを取得すれば以降カードリーダは不要となるため、
+# B-CAS カードをチューナに差したままにできるというメリットがあるかと思います。
+
+
+FILES
+=====
+
+ $HOME/.config/tsniff.conf ::
+   設定ファイル
+
+
 TODO
 ====
 
  * ECM鍵到着と利用の時間差を計測して表示
  * 時間ベースのTS遅延バッファサイズ指定
- * B-CASシステム鍵と初期CBCを設定ファイルに追い出す(配布しない)
  * 終了時の各種バッファのフラッシュ
  * 終了時の各種バッファとインスタンスの解放
  * カードリーダーを使えるようにする
+   * B-CAS 初期データをダンプする
  * 各種入力ソースと動作モードの整理
    * TS ← FX2 / ファイル
    * B-CAS ← FX2 / ファイル / カードリーダー

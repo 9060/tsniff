@@ -14,6 +14,8 @@ typedef struct PSEUDO_B_CAS_CARD {
 
     void (*push)(void *bcas, guint8 *data, guint len);
     void (*set_queue_len)(void *bcas, guint len);
+	void (*set_init_status)(void *bcas, const guint8 *system_key, const guint8 *init_cbc);
+	gboolean (*set_init_status_from_hex)(void *bcas, const gchar *system_key, const gchar *init_cbc);
 } PSEUDO_B_CAS_CARD;
 
 PSEUDO_B_CAS_CARD *

@@ -8,14 +8,6 @@
 #include "bcas_stream.h"
 #include "pseudo_bcas.h"
 
-static B_CAS_INIT_STATUS st_bcas_init_status = {
-	{ 0x36,0x31,0x04,0x66,0x4B,0x17,0xEA,0x5C,0x32,0xDF,0x9C,0xF5,0xC4,0xC3,0x6C,0x1B,
-	  0xEC,0x99,0x39,0x21,0x68,0x9D,0x4B,0xB7,0xB7,0x4E,0x40,0x84,0x0D,0x2E,0x7D,0x98, },
-	{ 0xFE,0x27,0x19,0x99,0x19,0x69,0x09,0x11, },
-	0,
-	0,
-};
-
 typedef struct ECMPacket {
 	/* Requested packet */
 	guint8 len;
@@ -27,6 +19,9 @@ typedef struct ECMPacket {
 } ECMPacket;
 
 typedef struct Context {
+	B_CAS_INIT_STATUS init_status;
+	gboolean is_init_status_valid;
+
 	BCASStream *stream;
 	GQueue *ecm_queue;
 	guint ecm_queue_len;
@@ -35,6 +30,34 @@ typedef struct Context {
 	gint response_delay;
 } Context;
 
+
+static guint8 *
+hexparse(const guint8 *hexdump, guint len)
+{
+	guint8 *data;
+	guint i;
+
+	if (hexdump == NULL) {
+		g_warning("[pseudo_bcas] NULL pointer passed");
+		return NULL;
+	}
+	if (len * 2 != strlen(hexdump)) {
+		g_warning("[pseudo_bcas] invalid length (expect=%d, actual=%d)", len * 2, strlen(hexdump));
+		return NULL;
+	}
+
+	data = g_malloc0(len);
+	for (i = 0; i < len; ++i) {
+		gint b = g_ascii_xdigit_value(hexdump[i]);
+		if (b < 0) {
+			g_warning("[pseudo_bcas] an invalid char '%c' appeared", hexdump[i]);
+			g_free(data);
+			return NULL;
+		}
+		data[i / 2] |= b << (i & 1 ? 0 : 8);
+	}
+	return data;
+}
 
 static GString *
 hexdump(guint8 *data, guint len, gboolean is_seperate)
@@ -131,6 +154,8 @@ init_b_cas_card(void *bcas)
 	g_message("[pseudo_bcas] initialize");
 	self = g_new(Context, 1);
 	((B_CAS_CARD *)bcas)->private_data = self;
+	memset(&self->init_status, 0, sizeof(self->init_status));
+	self->is_init_status_valid = FALSE;
 	self->ecm_queue = g_queue_new();
 	self->ecm_queue_len = 128;
 	self->stream = bcas_stream_new();
@@ -153,16 +178,24 @@ release_b_cas_card(void *bcas)
 	while (ecm = g_queue_pop_head(self->ecm_queue)) {
 		g_free(ecm);
 	}
-	g_free(self->ecm_queue);
+	g_queue_free(self->ecm_queue);
 
 	g_free(bcas);
 }
 
 static int get_init_status_b_cas_card(void *bcas, B_CAS_INIT_STATUS *stat)
 {
+	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
+
 	g_message("[pseudo_bcas] get initial status");
-	memcpy(stat, &st_bcas_init_status, sizeof(B_CAS_INIT_STATUS));
-	return 0;
+
+	if (self->is_init_status_valid) {
+		memcpy(stat, &self->init_status, sizeof(B_CAS_INIT_STATUS));
+		return 0;
+	} else {
+		g_warning("[pseudo_bcas] couldn't get initial status");
+		return -1;
+	}
 }
 
 static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, int len)
@@ -201,6 +234,37 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 }
 
 static void
+set_init_status(void *bcas, const guint8 *system_key, const guint8 *init_cbc)
+{
+	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
+
+	if (system_key && init_cbc) {
+		memcpy(&self->init_status.system_key, system_key, 32);
+		memcpy(&self->init_status.init_cbc, init_cbc, 8);
+		self->is_init_status_valid = TRUE;
+	}
+}
+
+static gboolean
+set_init_status_from_hex(void *bcas, const gchar *system_key, const gchar *init_cbc)
+{
+	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
+	guint8 *syskey, *initcbc;
+	gboolean result;
+
+	syskey = hexparse(system_key, 32);
+	initcbc = hexparse(init_cbc, 8);
+	result = (syskey && initcbc) ? TRUE : FALSE;
+
+	set_init_status(bcas, syskey, initcbc);
+
+	if (syskey) g_free(syskey);
+	if (initcbc) g_free(initcbc);
+
+	return result;
+}
+
+static void
 set_queue_len(void *bcas, guint len)
 {
 	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
@@ -231,6 +295,8 @@ pseudo_bcas_new(void)
 
 	r->push = push;
 	r->set_queue_len = set_queue_len;
+	r->set_init_status = set_init_status;
+	r->set_init_status_from_hex = set_init_status_from_hex;
 
 	return r;
 }

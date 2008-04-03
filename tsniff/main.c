@@ -51,6 +51,8 @@ static gboolean st_b25_is_enabled = FALSE;
 static gint st_b25_round = 4;
 static gboolean st_b25_strip = FALSE;
 static gint st_b25_bcas_queue_size = 256;
+static gchar *st_b25_system_key = NULL;
+static gchar *st_b25_init_cbc = NULL;
 static GOptionEntry st_b25_options[] = {
 	{ "b25-enable", 'B', 0, G_OPTION_ARG_NONE, &st_b25_is_enabled,
 	  "Enable B25 decoder [disabled]", NULL },
@@ -60,6 +62,10 @@ static GOptionEntry st_b25_options[] = {
 	  "Discard NULL packets from output [disabled]", NULL },
 	{ "b25-bcas-queue-size", 0, 0, G_OPTION_ARG_INT, &st_b25_bcas_queue_size,
 	  "Set ECM buffer capacity of pseudo B-CAS reader to N [256]", "N" },
+	{ "b25-system-key", 0, 0, G_OPTION_ARG_STRING, &st_b25_system_key,
+	  "Set B25 system key to HEX when using pseudo B-CAS reader", "HEX" },
+	{ "b25-init-cbc", 0, 0, G_OPTION_ARG_STRING, &st_b25_init_cbc,
+	  "Set B25 Init-CBC to HEX when using pseudo B-CAS reader", "HEX" },
 	{ NULL }
 };
 
@@ -200,19 +206,6 @@ transfer_bcas_cb(gpointer data, gint length, gpointer user_data)
 static gboolean
 init_b25(void)
 {
-	g_message("Initializing B25 decoder");
-	st_b25 = create_arib_std_b25();
-	if (!st_b25) {
-		g_critical("couldn't create B25 decoder");
-		return FALSE;
-	}
-
-	g_message("Set MULTI-2 round factor to %d", st_b25_round);
-	st_b25->set_multi2_round(st_b25, st_b25_round);
-
-	g_message("%s omit NULL packets", st_b25_strip ? "Enable" : "Disable");
-	st_b25->set_strip(st_b25, 0);
-
 	g_message("Initializing B-CAS card reader emulator");
 	st_bcas = (B_CAS_CARD *)pseudo_bcas_new();
 	if (!st_bcas) {
@@ -226,6 +219,25 @@ init_b25(void)
 
 	g_message("Set B-CAS ECM buffer queue length to %d", st_b25_bcas_queue_size);
 	((PSEUDO_B_CAS_CARD *)st_bcas)->set_queue_len(st_bcas, st_b25_bcas_queue_size);
+
+	if (!((PSEUDO_B_CAS_CARD *)st_bcas)->set_init_status_from_hex(st_bcas, st_b25_system_key, st_b25_init_cbc)) {
+		g_critical("!!! B-CAS SYSTEM-KEY AND INIT-CBC NOT SUPPLIED !!!");
+		st_bcas->release(st_bcas);
+		return FALSE;
+	}
+
+	g_message("Initializing B25 decoder");
+	st_b25 = create_arib_std_b25();
+	if (!st_b25) {
+		g_critical("couldn't create B25 decoder");
+		return FALSE;
+	}
+
+	g_message("Set MULTI-2 round factor to %d", st_b25_round);
+	st_b25->set_multi2_round(st_b25, st_b25_round);
+
+	g_message("%s omit NULL packets", st_b25_strip ? "Enable" : "Disable");
+	st_b25->set_strip(st_b25, 0);
 
 	st_b25->set_b_cas_card(st_b25, st_bcas);
 
@@ -387,6 +399,31 @@ verify_bcas_stream(void)
 	return;
 }
 
+static void
+load_key_file(void)
+{
+	GKeyFile *keyfile;
+	GError *error = NULL;
+	GString *path;
+
+	keyfile = g_key_file_new();
+
+	path = g_string_new(g_get_user_config_dir());
+	g_string_append(path, "/tsniff.conf");
+	g_message("[load_key_file] looking for %s", path->str);
+
+	if (g_key_file_load_from_file(keyfile, path->str, G_KEY_FILE_NONE, &error)) {
+		st_b25_system_key = g_key_file_get_string(keyfile, "b25", "system_key", NULL);
+		st_b25_init_cbc = g_key_file_get_string(keyfile, "b25", "init_cbc", NULL);
+	} else {
+		if (error) g_warning("[load_key_file] %s", error->message);
+		g_clear_error(&error);
+	}
+
+	g_string_free(path, TRUE);
+	g_key_file_free(keyfile);
+}
+
 static gboolean
 parse_options(int *argc, char ***argv)
 {
@@ -490,14 +527,15 @@ main(int argc, char **argv)
 {
 	GLogLevelFlags log_level = G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION;
 
-	if (!parse_options(&argc, &argv)) {
-		return 1;
-	}
-
 	g_log_set_handler(NULL, log_level, log_handler, NULL);
 	g_log_set_handler("cusbfx2", log_level, log_handler, NULL);
 	g_log_set_handler("capsts", log_level, log_handler, NULL);
 	g_log_set_handler("GLib", log_level, log_handler, NULL);
+
+	load_key_file();
+	if (!parse_options(&argc, &argv)) {
+		return 1;
+	}
 
 	if (st_verify_bcas_stream > 0 && st_bcas_filename) {
 		verify_bcas_stream();
