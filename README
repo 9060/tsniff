@@ -11,39 +11,170 @@ tsniff そのものに予約などの高度な機能を追加する予定は **�
 INSTALL
 =======
 
- libusb-1.0 0499e9f418607b5786ac0c3e97bc46737a609ca3
+Install from release
+--------------------
 
-1. 最新版の snapshot を入手します
+ $ tar zxvf tsniff-0.1.0.tar.gz
+ $ cd tsniff-0.1.0
+ $ ./configure
+ $ make
+ $ sudo make install
 
- $ wget "http://projects.reactivated.net/cgi-bin/gitweb.cgi?p=libusb.git;a=snapshot;h=0499e9f418607b5786ac0c3e97bc46737a609ca3;sf=tgz"
+Install from development repository
+-----------------------------------
+
+最新版の libusb-1.0 を入手し、bootstrap を実行します。
+ $ cd extra
+ $ git clone http://libusb-1.0 libusb-1.0
+ $ ( cd libusb-1.0 && ./autogen.sh )
+最新版の arib_std_b25-atty を入手し、bootstrap を実行します。
+ $ hg clone http://atty.skr.jp/hg/arib_std_b25-atty b25
+ $ ( cd b25 && ./autogen.sh )
+tsniff の bootstrap を実行し、make します。
+ $ cd ..
+ $ ./autogen.sh
+ $ mkdir build; cd build
+ $ ../configure
+ $ make
 
 
 USAGE
 =====
 
+
+OPTIONS
+=======
+
+入出力の指定
+------------
+
+FILENAME には標準入力または標準出力として、"-" を指定することが可能です。
+
+  -T, --ts-input=SOURCE
+      TS データ入力を SOURCE に設定します。SOURCE は以下の値を取ります。
+      デフォルトは "fx2:" です。
+
+        "fx2:"   - CUSBFX2 から TS を取得します。
+        FILENAME - ファイルから TS を取得します。
+
+  -B, --bcas-input SOURCE
+      B-CAS データ入力を SOURCE に設定します。SOURCE は以下の値を取ります。
+      デフォルトは "fx2:" です。
+
+        "fx2:"   - CUSBFX2 から B-CAS データを取得します。
+        "pcsc:"  - libpcsclite 経由でカードリーダから B-CAS データを取得します。
+                   --bcas-output, --verify-bcas-stream との併用はできません。
+        FILENAME - ファイルから B-CAS データを取得します。
+
+  -t, --ts-output=FILENAME
+      未加工 TS データを FILENAME へ出力します。
+
+  -b, --bcas-output=FILENAME
+      B-CAS データを FILENAME へ出力します。
+
+  -o, --b25-output=FILENAME
+      ARIB STD-B25 デコーダを有効にし、デコード済み TS データを FILENAME へ出力します。
+
 B-CAS 初期データ
 ----------------
 
---enable-b25 を指定し、かつ B-CAS のデータソースとして CUSBFX2 やファイルを使用する場合は、
-B-CAS 初期データ(システム鍵・初期 CBC)を明示的に指定する必要があります。
+--b25-output を指定し、かつ B-CAS データ入力に "fx2:" またはファイルを使用する場合は、
+B-CAS 初期データ(システム鍵・初期 CBC)を別途指定する必要があります。
 これは、カードリーダがなければ B-CAS 初期データを取得できないことからくる制限事項です。
 
 B-CAS 初期データは、オプションで指定するか、設定ファイルに書いておきます。
 
- $ tsniff --b25-system-key=00112233445566778899AABBCCDDEEFF00112233445566778899aabbccddeeff \
-     --b25-init-cbc=0011223344556677 --enable-b25
+ $ tsniff -o foo.ts \
+     --b25-system-key=00112233445566778899AABBCCDDEEFF00112233445566778899aabbccddeeff \
+     --b25-init-cbc=0011223344556677
 
  tsniff.conf ::
    [b25]
    system_key = 00112233445566778899AABBCCDDEEFF00112233445566778899aabbccddeeff
    init_cbc = 0011223344556677
 
-なお、B-CAS 初期データは以下の手順で取得できます。
+なお、B-CAS 初期データは --b25-dump-init-status で取得できます。
+そのまま設定ファイルとして利用するのが良いでしょう。
 
  $ tsniff --b25-dump-init-status >$HOME/.config/tsniff.conf
 
-# 最初に初期データを取得すれば以降カードリーダは不要となるため、
-# B-CAS カードをチューナに差したままにできるというメリットがあるかと思います。
+その他
+------
+
+  --verify-bcas-stream
+      B-CAS データの検証のみを行います。
+
+        $ tsniff --verify-bcas-stream -B foo.bcs    # ストレステスト
+
+      検証エラーが発生した場合は、B-CAS データの転送に失敗しています。
+      配線の見直しやバッファサイズの調整を行ってください。
+
+
+入出力の指定例
+--------------
+
+ $ tsniff -o foo.ts
+       Inputs      |             |   Outputs
+    ===============|=============|===========
+     CUSBFX2:TS  --|--+          |
+                   |  |          |
+                   |  +--> B25 --|--> foo.ts
+                   |  |          |
+    CUSBFX2:BCAS --|--+          |
+
+ $ tsniff -T fx2: -B fx2: -t foo.ets -b foo.bcs
+       Inputs      |             |   Outputs
+    ===============|=============|===========
+     CUSBFX2:TS  --|-------------|--> foo.ets
+                   |             |
+                   |       B25   |
+                   |             |
+    CUSBFX2:BCAS --|-------------|--> foo.bcs
+
+ $ tsniff -t foo.ets -b foo.bcs -o foo.ts
+       Inputs      |             |   Outputs
+    ===============|=============|===========
+     CUSBFX2:TS  --|--+----------|--> foo.ets
+                   |  |          |
+                   |  +--> B25 --|--> foo.ts
+                   |  |          |
+    CUSBFX2:BCAS --|--+----------|--> foo.bcs
+
+ $ tsniff -B pcsc: -t foo.ets -o foo.ts
+       Inputs      |             |   Outputs
+    ===============|=============|===========
+     CUSBFX2:TS  --|--+----------|--> foo.ets
+                   |  |          |
+                   |  +--> B25 --|--> foo.ts
+                   |  |          |
+      PCSC:BCAS  --|--+          |
+
+ $ tsniff -T foo.ets -B foo.bcs -o foo.ts
+       Inputs      |             |   Outputs
+    ===============|=============|===========
+      foo.ets    --|--+          |
+                   |  |          |
+                   |  +--> B25 --|--> foo.ts
+                   |  |          |
+      foo.bcs    --|--+          |
+
+ $ tsniff -T foo.ets -B pcsc: -o foo.ts
+       Inputs      |             |   Outputs
+    ===============|=============|===========
+      foo.ets    --|--+          |
+                   |  |          |
+                   |  +--> B25 --|--> foo.ts
+                   |  |          |
+      PCSC:BCAS  --|--+          |
+
+ $ tsniff -t - -o foo.ts | tsniff -T - -B pcsc: -t foo.ets -o bar.ts
+       Inputs      |             |   Outputs  ||    Inputs      |             |   Outputs
+    ===============|=============|=========== || ===============|=============|===========
+     CUSBFX2:TS  --|--+----------|--> STDOUT -||->  STDIN:TS  --|--+----------|--> foo.ets
+                   |  |          |            ||                |  |          |
+                   |  +--> B25 --|--> foo.ts  ||                |  +--> B25 --|--> bar.ts
+                   |  |          |            ||                |  |          |
+    CUSBFX2:BCAS --|--+          |            ||   PCSC:BCAS  --|--+          |
 
 
 FILES
