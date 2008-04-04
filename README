@@ -52,14 +52,14 @@ FILENAME には標準入力または標準出力として、"-" を指定する�
 
   -T, --ts-input=SOURCE
       TS データ入力を SOURCE に設定します。SOURCE は以下の値を取ります。
-      デフォルトは "fx2:" です。
+      省略時のデフォルトは "fx2:" です。
 
         "fx2:"   - CUSBFX2 から TS を取得します。
         FILENAME - ファイルから TS を取得します。
 
   -B, --bcas-input SOURCE
       B-CAS データ入力を SOURCE に設定します。SOURCE は以下の値を取ります。
-      デフォルトは "fx2:" です。
+      省略時のデフォルトは "fx2:" です。
 
         "fx2:"   - CUSBFX2 から B-CAS データを取得します。
         "pcsc:"  - libpcsclite 経由でカードリーダから B-CAS データを取得します。
@@ -104,7 +104,8 @@ B-CAS 初期データは、オプションで指定するか、設定ファイ�
   --verify-bcas-stream
       B-CAS データの検証のみを行います。
 
-        $ tsniff --verify-bcas-stream -B foo.bcs    # ストレステスト
+        $ tsniff --verify-bcas-stream -B foo.bcs    # 検証
+        $ tsniff --verify-bcas-stream -B fx2:       # ストレステスト
 
       検証エラーが発生した場合は、B-CAS データの転送に失敗しています。
       配線の見直しやバッファサイズの調整を行ってください。
