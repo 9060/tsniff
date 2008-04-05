@@ -146,7 +146,7 @@ void
 capsts_set_ir_base(gint base)
 {
 	st_ir_base = (CLAMP(base, 1, 3) - 1) * 0x80;
-	g_message("[capsts_set_ir_base] set IR base channel to %d", base + 1);
+	g_message("[capsts_set_ir_base] set IR base channel to %d", st_ir_base + 1);
 }
 
 /**

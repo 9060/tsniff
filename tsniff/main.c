@@ -461,7 +461,6 @@ run(void)
 		capsts_cmd_push(CMD_IFCONFIG, 0xE3);
 		capsts_cmd_commit(device);
 
-		g_message("*** [capsts_set_ir_base] %d", st_ir_base);
 		capsts_set_ir_base(st_ir_base);
 		capsts_adjust_tuner_channel(device, st_ir_source, st_ir_channel, st_ir_three_channel);
 
