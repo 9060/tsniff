@@ -51,6 +51,7 @@ static GOptionEntry st_ir_options[] = {
 static gboolean st_b25_is_enabled = FALSE;
 static gint st_b25_round = 4;
 static gboolean st_b25_strip = FALSE;
+static gint st_b25_ts_delay = 3;
 static gint st_b25_bcas_queue_size = 256;
 static gchar *st_b25_system_key = NULL;
 static gchar *st_b25_init_cbc = NULL;
@@ -59,6 +60,8 @@ static GOptionEntry st_b25_options[] = {
 	  "Set MULTI-2 round factor to N [4]", "N" },
 	{ "b25-strip", 'S', 0, G_OPTION_ARG_NONE, &st_b25_strip,
 	  "Discard NULL packets from output [disabled]", NULL },
+	{ "b25-ts-delay", 0, 0, G_OPTION_ARG_INT, &st_b25_ts_delay,
+	  "Delay TS input by N seconds, if --bcas-input=fx2: [3]", "N" },
 	{ "b25-bcas-queue-size", 0, 0, G_OPTION_ARG_INT, &st_b25_bcas_queue_size,
 	  "Set ECM buffer capacity of pseudo B-CAS reader to N [256]", "N" },
 	{ "b25-system-key", 0, 0, G_OPTION_ARG_STRING, &st_b25_system_key,
@@ -118,12 +121,17 @@ static GIOChannel *st_bcas_output_io = NULL;
 static GIOChannel *st_b25_output_io = NULL;
 
 
-/* Ring buffer
+/* TS Time-shift buffer
    -------------------------------------------------------------------------- */
+typedef struct {
+	GTimeVal arrived_time;
+	gsize size;
+	/* guint8 data[size]; */
+} B25Chunk;
+
 static GQueue *st_b25_queue = NULL;
 static gsize st_b25_queue_size = 0;
-static gsize st_b25_queue_max = 32*1024*1024;
-
+#define MAX_B25_QUEUE_SIZE (128*1024*1024)
 
 /* Signal handler
    -------------------------------------------------------------------------- */
@@ -205,27 +213,44 @@ transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 	}
 
 	if (st_b25_output_io) {
-		gint ret;
-		gpointer *chunk;
-
 		if (st_b25_queue) {
+			GTimeVal now;
+			B25Chunk *chunk;
+			
+			g_get_current_time(&now);
+			
 			/* キューに積む */
-			chunk = g_slice_alloc(sizeof(gsize) + length);
-			*(gsize *)chunk = length;
-			memcpy(((gsize *)chunk) + 1, data, length);
-			g_queue_push_tail(st_b25_queue, chunk);
-			st_b25_queue_size += length;
+			if (st_b25_queue_size > MAX_B25_QUEUE_SIZE) {
+				g_warning("[transfer_ts_callback] !!! TS TIME-SHIFT BUFFER OVERRUN !!!");
+			} else {
+				chunk = g_slice_alloc(sizeof(B25Chunk) + length);
+				chunk->arrived_time = now;
+				chunk->size = length;
+				memcpy(chunk + 1, data, length);
+				g_queue_push_tail(st_b25_queue, chunk);
+				st_b25_queue_size += length;
+			}
 
-			while (st_b25_queue_size > st_b25_queue_max) {
-				gpointer pop = g_queue_pop_head(st_b25_queue);
-				gsize size = *(gsize *)pop;
+			while (chunk = g_queue_peek_head(st_b25_queue)) {
+				gdouble diff;
 
-				if (!pop) break;
+				if (!chunk) {
+					/* empty */
+					break;
+				}
 
-				proc_b25((gpointer)(((gsize *)pop) + 1), size);
+				diff = now.tv_sec - chunk->arrived_time.tv_sec
+					+ (((gdouble)now.tv_usec - chunk->arrived_time.tv_usec) / 1000000);
+				if (diff < st_b25_ts_delay) {
+					break;
+				}
 
-				g_slice_free1(sizeof(gsize) + size, pop);
-				st_b25_queue_size -= size;
+				chunk = g_queue_pop_head(st_b25_queue);
+
+				proc_b25(chunk + 1, chunk->size);
+
+				st_b25_queue_size -= chunk->size;
+				g_slice_free1(sizeof(B25Chunk) + chunk->size, chunk);
 			}
 		} else {
 			proc_b25(data, length);
@@ -394,6 +419,7 @@ run(void)
 	GTimer *timer; 
 	gboolean is_cusbfx2_inited = FALSE;
 	gboolean is_cusbfx2_started = FALSE;
+	GString *status = NULL;
 
 	/* Initialize inputs */
 	if (!g_str_has_prefix(st_ts_input, TS_INPUT_FX2_PREFIX)) {
@@ -515,6 +541,7 @@ run(void)
 	}
 
 	/* main loop */
+	status = g_string_sized_new(128);
 	timer = g_timer_new();
 	while (st_is_running) {
 		gdouble elapsed;
@@ -536,13 +563,17 @@ run(void)
 				break;
 			}
 		} else if (is_cusbfx2_started) {
+
 			cusbfx2_poll();
 
 			elapsed = g_timer_elapsed(timer, NULL);
-			g_fprintf(stderr, ">>> Now:%.1f TS:%d(%3d%%)\r",
-					  elapsed,
-					  st_b25_queue_size,
-					  (gsize)((gdouble)st_b25_queue_size / st_b25_queue_max * 100));
+			g_string_printf(status, ">>> Now:%.1f ", elapsed);
+			if (st_b25_queue) {
+				g_string_append_printf(status, "TSbuf:%.2fM(%3d%%)",
+									   (gdouble)st_b25_queue_size / (1024 * 1024),
+									   (gsize)((gdouble)st_b25_queue_size / MAX_B25_QUEUE_SIZE * 100));
+			}
+			g_fprintf(stderr, "%s\r", status->str);
 
 			if (st_length > 0 && elapsed > st_length) {
 				break;
@@ -550,6 +581,7 @@ run(void)
 		}
 	}
 	g_fprintf(stderr, "\n");
+	if (status) g_string_free(status, TRUE);
 	g_timer_destroy(timer);
 
 	if (st_is_running) {
@@ -586,14 +618,19 @@ run(void)
 		ARIB_STD_B25_BUFFER buffer;
 
 		if (st_b25_queue) {
-			gpointer chunk;
+			B25Chunk *chunk;
 
 			g_message("*** flush TS time-shift buffer");
 			while (chunk = g_queue_pop_head(st_b25_queue)) {
-				gsize size = *(gsize *)chunk;
-				proc_b25((gpointer)(((gsize *)chunk) + 1), size);
-				g_slice_free1(sizeof(gsize) + size, chunk);
-				st_b25_queue_size -= size;
+				if (!chunk) {
+					/* empty */
+					break;
+				}
+
+				proc_b25(chunk + 1, chunk->size);
+
+				st_b25_queue_size -= chunk->size;
+				g_slice_free1(sizeof(B25Chunk) + chunk->size, chunk);
 			}
 			g_queue_free(st_b25_queue);
 		}
