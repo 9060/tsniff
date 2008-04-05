@@ -47,14 +47,14 @@ hexparse(const guint8 *hexdump, guint len)
 	}
 
 	data = g_malloc0(len);
-	for (i = 0; i < len; ++i) {
+	for (i = 0; i < len * 2; ++i) {
 		gint b = g_ascii_xdigit_value(hexdump[i]);
 		if (b < 0) {
 			g_warning("[pseudo_bcas] an invalid char '%c' appeared", hexdump[i]);
 			g_free(data);
 			return NULL;
 		}
-		data[i / 2] |= b << (i & 1 ? 0 : 8);
+		data[i / 2] |= b << ((i & 1) ? 0 : 4);
 	}
 	return data;
 }
