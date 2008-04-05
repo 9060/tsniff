@@ -279,6 +279,13 @@ set_queue_len(void *bcas, guint len)
 	self->ecm_queue_len = len;
 }
 
+static gsize
+get_queue_current_len(void *bcas)
+{
+	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
+	return self->ecm_queue->length;
+}
+
 static void
 push(void *bcas, guint8 *data, guint len)
 {
@@ -303,6 +310,7 @@ pseudo_bcas_new(void)
 
 	r->push = push;
 	r->set_queue_len = set_queue_len;
+	r->get_queue_current_len = get_queue_current_len;
 	r->set_init_status = set_init_status;
 	r->set_init_status_from_hex = set_init_status_from_hex;
 

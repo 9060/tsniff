@@ -10,9 +10,14 @@
 #include "pseudo_bcas.h"
 #include "bcas_stream.h"
 
-#define TS_INPUT_FX2_PREFIX "fx2:"
-#define BCAS_INPUT_FX2_PREFIX "fx2:"
-#define BCAS_INPUT_PCSC_PREFIX "pcsc:"
+
+#define INPUT_TYPE_FX2_PREFIX "fx2:"
+#define INPUT_TYPE_PCSC_PREFIX "pcsc:"
+#define INPUT_TYPE_FX2 0
+#define INPUT_TYPE_FILE 1
+#define INPUT_TYPE_PCSC 2
+static gint st_ts_input_type;
+static gint st_bcas_input_type;
 
 /* Options
    -------------------------------------------------------------------------- */
@@ -61,7 +66,7 @@ static GOptionEntry st_b25_options[] = {
 	{ "b25-strip", 'S', 0, G_OPTION_ARG_NONE, &st_b25_strip,
 	  "Discard NULL packets from output [disabled]", NULL },
 	{ "b25-ts-delay", 0, 0, G_OPTION_ARG_INT, &st_b25_ts_delay,
-	  "Delay TS input by N seconds, if --bcas-input=fx2: [3]", "N" },
+	  "Delay TS input by N seconds, if --bcas-input="INPUT_TYPE_FX2_PREFIX" [3]", "N" },
 	{ "b25-bcas-queue-size", 0, 0, G_OPTION_ARG_INT, &st_b25_bcas_queue_size,
 	  "Set ECM buffer capacity of pseudo B-CAS reader to N [256]", "N" },
 	{ "b25-system-key", 0, 0, G_OPTION_ARG_STRING, &st_b25_system_key,
@@ -71,8 +76,8 @@ static GOptionEntry st_b25_options[] = {
 	{ NULL }
 };
 
-static gchar *st_ts_input = BCAS_INPUT_FX2_PREFIX;
-static gchar *st_bcas_input = BCAS_INPUT_FX2_PREFIX;
+static gchar *st_ts_input = INPUT_TYPE_FX2_PREFIX;
+static gchar *st_bcas_input = INPUT_TYPE_FX2_PREFIX;
 static gchar *st_ts_output = NULL;
 static gchar *st_bcas_output = NULL;
 static gchar *st_b25_output = NULL;
@@ -83,9 +88,9 @@ static gboolean st_dump_bcas_init_status = FALSE;
 static gint st_verify_bcas_stream = -1;
 static GOptionEntry st_main_options[] = {
 	{ "ts-input", 'T', 0, G_OPTION_ARG_FILENAME, &st_ts_input,
-	  "Input MPEG2-TS from SOURCE (" BCAS_INPUT_FX2_PREFIX " or FILENAME) [" BCAS_INPUT_FX2_PREFIX "]", "SOURCE" },
+	  "Input MPEG2-TS from SOURCE ("INPUT_TYPE_FX2_PREFIX" or FILENAME) ["INPUT_TYPE_FX2_PREFIX"]", "SOURCE" },
 	{ "bcas-input", 'B', 0, G_OPTION_ARG_FILENAME, &st_bcas_input,
-	  "Input B-CAS from SOURCE (" BCAS_INPUT_FX2_PREFIX " or " BCAS_INPUT_PCSC_PREFIX " or FILENAME) [" BCAS_INPUT_FX2_PREFIX "]", "SOURCE" },
+	  "Input B-CAS from SOURCE ("INPUT_TYPE_FX2_PREFIX" or "INPUT_TYPE_PCSC_PREFIX" or FILENAME) ["INPUT_TYPE_FX2_PREFIX"]", "SOURCE" },
 
 	{ "ts-output", 't', 0, G_OPTION_ARG_FILENAME, &st_ts_output,
 	  "Output raw MPEG2-TS to FILENAME", "FILENAME" },
@@ -119,7 +124,6 @@ static GIOChannel *st_bcas_input_io = NULL;
 static GIOChannel *st_ts_output_io = NULL;
 static GIOChannel *st_bcas_output_io = NULL;
 static GIOChannel *st_b25_output_io = NULL;
-
 
 /* TS Time-shift buffer
    -------------------------------------------------------------------------- */
@@ -213,10 +217,17 @@ transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 	}
 
 	if (st_b25_output_io) {
-		if (st_b25_queue) {
+		if (!st_b25_queue) {
+			proc_b25(data, length);
+		} else {
 			GTimeVal now;
 			B25Chunk *chunk;
 			
+			if (st_bcas_input_type == INPUT_TYPE_FX2) {
+				if (((PSEUDO_B_CAS_CARD *)st_bcas)->get_queue_current_len(st_bcas) == 0)
+					return st_is_running;
+			}
+
 			g_get_current_time(&now);
 			
 			/* キューに積む */
@@ -252,8 +263,6 @@ transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 				st_b25_queue_size -= chunk->size;
 				g_slice_free1(sizeof(B25Chunk) + chunk->size, chunk);
 			}
-		} else {
-			proc_b25(data, length);
 		}
 	}
 
@@ -280,6 +289,7 @@ transfer_bcas_cb(gpointer data, gint length, gpointer user_data)
 	return st_is_running;
 }
 
+/* -------------------------------------------------------------------------- */
 
 static GIOChannel *
 open_io_channel(const gchar *filename, gboolean is_output)
@@ -317,14 +327,14 @@ init_b25(void)
 	gint r;
 
 	/* B-CAS カードクラスの初期化 */
-	if (g_str_has_prefix(st_bcas_input, BCAS_INPUT_PCSC_PREFIX)) {
+	if (st_bcas_input_type == INPUT_TYPE_PCSC) {
 		g_message("*** using real B-CAS card reader");
 		st_bcas = create_b_cas_card();
 		is_pseudo_bcas = FALSE;
 	} else {
 		st_bcas = (B_CAS_CARD *)pseudo_bcas_new();
 
-		if (g_str_has_prefix(st_bcas_input, BCAS_INPUT_FX2_PREFIX)) {
+		if (st_bcas_input_type == INPUT_TYPE_FX2) {
 			g_message("*** using pseudo B-CAS card reader with CUSBFX2");
 		} else {
 			g_message("*** using pseudo B-CAS card reader with <%s>", st_bcas_input);
@@ -348,7 +358,7 @@ init_b25(void)
 			return FALSE;
 		}
 
-		if (g_str_has_prefix(st_bcas_input, BCAS_INPUT_FX2_PREFIX)) {
+		if (st_bcas_input_type == INPUT_TYPE_FX2) {
 			g_message("*** set B-CAS ECM buffer queue length to %d", st_b25_bcas_queue_size);
 			((PSEUDO_B_CAS_CARD *)st_bcas)->set_queue_len(st_bcas, st_b25_bcas_queue_size);
 		} else {
@@ -372,7 +382,7 @@ init_b25(void)
 	st_b25->set_b_cas_card(st_b25, st_bcas);
 
 	/* Initialize TS time-shift buffer */
-	if (g_str_has_prefix(st_bcas_input, BCAS_INPUT_FX2_PREFIX)) {
+	if (st_bcas_input_type == INPUT_TYPE_FX2) {
 		st_b25_queue = g_queue_new();
 		g_message("*** Initalize TS time-shift buffer");
 	}
@@ -422,14 +432,14 @@ run(void)
 	GString *status = NULL;
 
 	/* Initialize inputs */
-	if (!g_str_has_prefix(st_ts_input, TS_INPUT_FX2_PREFIX)) {
+	if (st_ts_input_type == INPUT_TYPE_FILE) {
 		if (!(st_ts_input_io = open_io_channel(st_ts_input, FALSE))) {
 			g_critical("!!! couldn't open TS input <%s>", st_ts_input);
 			goto quit;
 		}
 	}
 
-	if (!g_str_has_prefix(st_bcas_input, BCAS_INPUT_FX2_PREFIX) && !g_str_has_prefix(st_bcas_input, BCAS_INPUT_PCSC_PREFIX)) {
+	if (st_bcas_input_type == INPUT_TYPE_FILE) {
 		if (!(st_bcas_input_io = open_io_channel(st_bcas_input, FALSE))) {
 			g_critical("!!! couldn't open B-CAS input <%s>", st_bcas_input);
 			goto quit;
@@ -481,7 +491,7 @@ run(void)
 		capsts_set_ir_base(st_ir_base);
 		capsts_adjust_tuner_channel(device, st_ir_source, st_ir_channel);
 
-		if (g_str_has_prefix(st_ts_input, TS_INPUT_FX2_PREFIX)) {
+		if (st_ts_input_type == INPUT_TYPE_FX2) {
 			g_message("*** setup TS transfer");
 			transfer_ts = cusbfx2_init_bulk_transfer(device, "TS", ENDPOINT_TS_IN,
 													 st_fx2_ts_buffer_size, st_fx2_ts_buffer_count,
@@ -493,7 +503,7 @@ run(void)
 			capsts_cmd_push(CMD_EP6IN_START);
 		}
 
-		if (g_str_has_prefix(st_bcas_input, BCAS_INPUT_FX2_PREFIX)) {
+		if (st_bcas_input_type == INPUT_TYPE_FX2) {
 			g_message("*** setup B-CAS transfer");
 			transfer_bcas = cusbfx2_init_bulk_transfer(device, "B-CAS", ENDPOINT_BCAS_IN,
 													   32, 1, transfer_bcas_cb, NULL);
@@ -814,7 +824,19 @@ parse_options(int *argc, char ***argv)
 	st_ir_base = CLAMP(st_ir_base, 1, 3);
 	st_ir_source = CLAMP(st_ir_source, -1, 2);
 
-	if (g_str_has_prefix(st_ts_input, TS_INPUT_FX2_PREFIX) || g_str_has_prefix(st_bcas_input, TS_INPUT_FX2_PREFIX)) {
+	if (g_str_has_prefix(st_ts_input, INPUT_TYPE_FX2_PREFIX))
+		st_ts_input_type = INPUT_TYPE_FX2;
+	else
+		st_ts_input_type = INPUT_TYPE_FILE;
+
+	if (g_str_has_prefix(st_bcas_input, INPUT_TYPE_FX2_PREFIX))
+		st_bcas_input_type = INPUT_TYPE_FX2;
+	else if (g_str_has_prefix(st_bcas_input, INPUT_TYPE_PCSC_PREFIX))
+		st_bcas_input_type = INPUT_TYPE_PCSC;
+	else
+		st_bcas_input_type = INPUT_TYPE_FILE;
+
+	if (st_ts_input_type == INPUT_TYPE_FX2 || st_bcas_input_type == INPUT_TYPE_FX2) {
 		st_is_use_cusbfx2 = TRUE;
 	}
 
