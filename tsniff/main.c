@@ -169,12 +169,12 @@ proc_b25(gpointer data, gsize length)
 	buffer.data = data;
 	r = st_b25->put(st_b25, &buffer);
 	if (r < 0) {
-		g_warning("!!! b25->put %d", r);
+		g_warning("!!! ARIB_STD_B25::put failed (%d)", r);
 	}
 
 	r = st_b25->get(st_b25, &buffer);
 	if (r < 0) {
-		g_warning("!!! b25->get %d", r);
+		g_warning("!!! ARIB_STD_B25::get failed (%d)", r);
 	} else if (buffer.size > 0) {
 		GError *error = NULL;
 		gsize written;
@@ -372,13 +372,13 @@ info_b25(ARIB_STD_B25 *b25)
 
 	n_programs = b25->get_program_count(b25);
 	if (n_programs < 0) {
-		g_warning("!!! ARIB_STD_B25::get_program_count (%d)", n_programs);
+		g_warning("!!! ARIB_STD_B25::get_program_count failed (%d)", n_programs);
 	} else {
 		for (i = 0; i < n_programs; ++i) {
 			gint r;
 			r = b25->get_program_info(b25, &info, i);
 			if (r < 0) {
-				g_warning("!!! ARIB_STD_B25::get_program_info(%d) (%d)", i, r);
+				g_warning("!!! ARIB_STD_B25::get_program_info(%d) failed (%d)", i, r);
 			} else {
 				g_message("> CH:%5d unpurchased ECM:%d(%04x)"
 						  " undecrypted TS:%8"G_GINT64_FORMAT"/%8"G_GINT64_FORMAT" (%.3f%%)",
@@ -604,12 +604,12 @@ run(void)
 
 		r = st_b25->flush(st_b25);
 		if (r < 0) {
-			g_warning("!!! ARIB_STD_B25::flush() failed (%d)", r);
+			g_warning("!!! ARIB_STD_B25::flush failed (%d)", r);
 		}
 
 		r = st_b25->get(st_b25, &buffer);
 		if (r < 0) {
-			g_warning("!!! b25->get %d", r);
+			g_warning("!!! ARIB_STD_B25::get failed (%d)", r);
 		} else if (buffer.size > 0) {
 			GError *error = NULL;
 			gsize written;
