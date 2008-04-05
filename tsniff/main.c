@@ -430,6 +430,7 @@ run(void)
 	gboolean is_cusbfx2_inited = FALSE;
 	gboolean is_cusbfx2_started = FALSE;
 	GString *status = NULL;
+	gdouble ts_disposed_time;
 
 	/* Initialize inputs */
 	if (st_ts_input_type == INPUT_TYPE_FILE) {
@@ -553,6 +554,7 @@ run(void)
 	/* main loop */
 	status = g_string_sized_new(128);
 	timer = g_timer_new();
+	ts_disposed_time = -1.;
 	while (st_is_running) {
 		gdouble elapsed;
 
@@ -577,6 +579,14 @@ run(void)
 			cusbfx2_poll();
 
 			elapsed = g_timer_elapsed(timer, NULL);
+
+			if (st_b25_queue && st_bcas_input_type == INPUT_TYPE_FX2 && ts_disposed_time < .0) {
+				if (((PSEUDO_B_CAS_CARD *)st_bcas)->get_queue_current_len(st_bcas) > 0) {
+					ts_disposed_time = elapsed;
+					g_message("*** dispose leading TS stream by %.1f seconds", ts_disposed_time);
+				}
+			}
+
 			g_string_printf(status, ">>> Now:%.1f ", elapsed);
 			if (st_b25_queue) {
 				g_string_append_printf(status, "TSbuf:%.2fM(%3d%%)",
