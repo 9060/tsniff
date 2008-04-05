@@ -37,17 +37,14 @@ static GOptionEntry st_fx2_options[] = {
 
 static gint st_ir_base = 0;
 static gint st_ir_source = -1;
-static gint st_ir_channel = -1;
-static gchar *st_ir_three_channel = NULL;
+static gchar *st_ir_channel = NULL;
 static GOptionEntry st_ir_options[] = {
 	{ "ir-base", 0, 0, G_OPTION_ARG_INT, &st_ir_base,
 	  "Set IR base channel to N (1..3) [1]", "N" },
 	{ "ir-source", 's', 0, G_OPTION_ARG_INT, &st_ir_source,
 	  "Set tuner source to N (0:Terestrial 1:BS 2:CS)", "N" },
 	{ "ir-channel", 'c', 0, G_OPTION_ARG_INT, &st_ir_channel,
-	  "Set tuner channel to C (1..12)", "C" },
-	{ "ir-three-channel", '3', 0, G_OPTION_ARG_STRING, &st_ir_three_channel,
-	  "Set tuner channel to CCC (BS/CS only)", "CCC" },
+	  "Set tuner channel to C (1..12 or 000...999)", "C" },
 	{ NULL }
 };
 
@@ -462,7 +459,7 @@ run(void)
 		capsts_cmd_commit(device);
 
 		capsts_set_ir_base(st_ir_base);
-		capsts_adjust_tuner_channel(device, st_ir_source, st_ir_channel, st_ir_three_channel);
+		capsts_adjust_tuner_channel(device, st_ir_source, st_ir_channel);
 
 		if (g_str_has_prefix(st_ts_input, TS_INPUT_FX2_PREFIX)) {
 			g_message("*** setup TS transfer");
@@ -726,30 +723,9 @@ parse_options(int *argc, char ***argv)
 
 	st_ir_base = CLAMP(st_ir_base, 1, 3);
 	st_ir_source = CLAMP(st_ir_source, -1, 2);
-	st_ir_channel = CLAMP(st_ir_channel, -1, 12);
 
 	if (g_str_has_prefix(st_ts_input, TS_INPUT_FX2_PREFIX) || g_str_has_prefix(st_bcas_input, TS_INPUT_FX2_PREFIX)) {
 		st_is_use_cusbfx2 = TRUE;
-	}
-
-	/* 3桁チャンネルのフォーマットチェック */
-	if (st_ir_three_channel) {
-		gboolean is_valid = TRUE;
-		gchar *p;
-		if (strlen(st_ir_three_channel) != 3) {
-			is_valid = FALSE;
-		} else {
-			for (p = st_ir_three_channel; *p; ++p) {
-				if (!g_ascii_isdigit(*p)) {
-					is_valid = FALSE;
-					break;
-				}
-			}
-		}
-		if (!is_valid) {
-			g_critical("Invalid channel format");
-			return FALSE;
-		}
 	}
 
 	return TRUE;

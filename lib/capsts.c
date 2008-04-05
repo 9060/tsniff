@@ -224,13 +224,15 @@ capsts_ir_cmd_commit(cusbfx2_handle *device)
 /**
  * チューナーの入力ソースとチャンネルを変更する。
  *
+ * \a channel が 3 文字の場合は 3 桁チャンネルによりチャンネル変更を行う。
+ * そうでなければ、1 〜 12 の範囲にクランプし、チャンネル変更を行う。
+ *
  * @param device
  * @param source	入力ソース -- TUNER_SOURCE_MAX の場合は変更しない
- * @param chnannel	1ボタンチャンネル(1〜12) -- 範囲外の場合は変更しない
- * @param three_channel	3桁チャンネル(000〜999) -- BS/CSの場合のみ
+ * @param channel	チャンネル
  */
 gboolean
-capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, gint channel, const gchar *three_channel)
+capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, const gchar *channel)
 {
 	/* まず入力ソースを切り替える */
 	switch (source) {
@@ -252,27 +254,24 @@ capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, gi
 		break;
 	}
 
-	/* 入力がBS/CSかつ3桁チャンネルが指定されていれば、3桁チャンネル入力によってチャンネルを変更 */
-	if (three_channel && source != TUNER_SOURCE_TERESTRIAL) {
-		g_message("[capsts_adjust_tuner_channel] channel: %s (3digit)", three_channel);
+	/* 入力がBS/CSかつチャンネルが3桁で指定されていれば、3桁チャンネル入力によってチャンネルを変更 */
+	if (channel && strlen(channel) == 3 && source != TUNER_SOURCE_TERESTRIAL) {
+		const gchar *p;
+
+		g_message("[capsts_adjust_tuner_channel] channel: %s (3digit)", channel);
 		capsts_ir_cmd_push(IR_CMD_3DIGIT_INPUT);
 
-		if (strlen(three_channel) != 3) {
-			g_warning("[capsts_ir_cmd_push] invalid channel format (must be three digit)");
-			if (st_ir_cmd_queue) g_array_free(st_ir_cmd_queue, TRUE);
-			return FALSE;
-		} else {
-			const gchar *p;
-			for (p = three_channel; *p; ++p) {
-				capsts_ir_cmd_push(IR_CMD_0 + CLAMP(g_ascii_digit_value(*p), 0, 9));
-			}
+		for (p = channel; *p; ++p) {
+			capsts_ir_cmd_push(IR_CMD_0 + CLAMP(g_ascii_digit_value(*p), 0, 9));
 		}
-	} else if (channel >= 1 && channel <= 12) {
-		g_message("[capsts_adjust_tuner_channel] channel: %d", channel);
+	} else if (channel) {
 		/* 通常のチャンネルが指定されていれば、変更 */
 		static CapStsIrCommand cmd[] = { IR_CMD_1, IR_CMD_2, IR_CMD_3, IR_CMD_4, IR_CMD_5, IR_CMD_6,
 										 IR_CMD_7, IR_CMD_8, IR_CMD_9, IR_CMD_0, IR_CMD_11, IR_CMD_12 };
-		capsts_ir_cmd_push(cmd[CLAMP(channel, 1, 12) - 1]);
+		gint ch;
+		ch = CLAMP((gint)g_ascii_strtoll(channel, NULL, 10), 1, 12);
+		g_message("[capsts_adjust_tuner_channel] channel: %d", ch);
+		capsts_ir_cmd_push(cmd[ch - 1]);
 	} else {
 		g_message("[capsts_adjust_tuner_channel] channel: keep current");
 	}

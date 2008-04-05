@@ -160,6 +160,6 @@ gboolean
 capsts_ir_cmd_commit(cusbfx2_handle *device);
 
 gboolean
-capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, gint channel, const gchar *three_channel);
+capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, const gchar *channel);
 
 #endif	/* CAPSTS_H_INCLUDED */
