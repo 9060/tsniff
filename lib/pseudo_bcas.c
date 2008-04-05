@@ -176,7 +176,7 @@ release_b_cas_card(void *bcas)
 	bcas_stream_free(self->stream);
 
 	while (ecm = g_queue_pop_head(self->ecm_queue)) {
-		g_free(ecm);
+		g_slice_free(ECMPacket, ecm);
 	}
 	g_queue_free(self->ecm_queue);
 
