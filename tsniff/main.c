@@ -554,7 +554,7 @@ run(void)
 					  st_b25_queue_size,
 					  (gsize)((gdouble)st_b25_queue_size / st_b25_queue_max * 100));
 
-			if (elapsed > st_length) {
+			if (st_length > 0 && elapsed > st_length) {
 				break;
 			}
 		}
