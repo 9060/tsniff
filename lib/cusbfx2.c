@@ -328,6 +328,7 @@ cusbfx2_transfer_callback(struct libusb_transfer *usb_transfer)
 
 	case LIBUSB_TRANSFER_CANCELLED:
 		g_warning("[cusbfx2_transfer_callback] %s: canceled", transfer->name);
+		is_resubmit = FALSE;
 		break;
 
 	default:
@@ -407,6 +408,19 @@ cusbfx2_start_transfer(cusbfx2_transfer *transfer)
 		gint r = libusb_submit_transfer(usb_transfer);
 		if (r) {
 			g_critical("[cusbfx2_start_transfer] %s: libusb_submit_transfer failed (%d)", transfer->name, r);
+		}
+	}
+}
+
+void
+cusbfx2_cancel_transfer(cusbfx2_transfer *transfer)
+{
+	GSList *p;
+	for (p = transfer->usb_transfers; p; p = g_slist_next(p)) {
+		struct libusb_transfer *usb_transfer = (struct libusb_transfer *)p->data;
+		gint r = libusb_cancel_transfer(usb_transfer);
+		if (r) {
+			g_warning("[cusbfx2_cancel_transfer_sync] %s: libusb_cancel_transfer_sync failed (%d)", transfer->name, r);
 		}
 	}
 }

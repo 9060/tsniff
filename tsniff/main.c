@@ -609,6 +609,7 @@ run(void)
 	} else {
 		g_message("### INTERRUPTED SHUTDOWN ###");
 	}
+	st_is_running = FALSE;
 
  quit:
 	/* finalize */
@@ -622,8 +623,6 @@ run(void)
 			capsts_cmd_push(CMD_MODE_IDLE);
 			capsts_cmd_commit(device);
 		}
-
-		/* TODO: poll? */
 
 		if (transfer_ts) cusbfx2_free_transfer(transfer_ts);
 		if (transfer_bcas) cusbfx2_free_transfer(transfer_bcas);

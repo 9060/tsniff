@@ -35,6 +35,12 @@ void
 cusbfx2_start_transfer(cusbfx2_transfer *transfer);
 
 void
+cusbfx2_cancel_transfer(cusbfx2_transfer *transfer);
+
+void
+cusbfx2_cancel_transfer_sync(cusbfx2_transfer *transfer);
+
+void
 cusbfx2_free_transfer(cusbfx2_transfer *transfer);
 
 int
