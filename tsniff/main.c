@@ -169,13 +169,13 @@ proc_b25(gpointer data, gsize length)
 	buffer.data = data;
 	r = st_b25->put(st_b25, &buffer);
 	if (r < 0) {
-		g_critical("!!! b25->put %d", r);
+		g_warning("!!! b25->put %d", r);
 	}
 
 	r = st_b25->get(st_b25, &buffer);
 	if (r < 0) {
-		g_critical("!!! b25->get %d", r);
-	} else {
+		g_warning("!!! b25->get %d", r);
+	} else if (buffer.size > 0) {
 		GError *error = NULL;
 		gsize written;
 		g_io_channel_write_chars(st_b25_output_io, buffer.data, buffer.size, &written, &error);
@@ -362,6 +362,35 @@ release_b25(void)
 	}
 	if (st_b25) st_b25->release(st_b25);
 	if (st_bcas) st_bcas->release(st_bcas);
+}
+
+static void
+info_b25(ARIB_STD_B25 *b25)
+{
+	ARIB_STD_B25_PROGRAM_INFO info;
+	gint n_programs, i;
+
+	n_programs = b25->get_program_count(b25);
+	if (n_programs < 0) {
+		g_warning("!!! ARIB_STD_B25::get_program_count (%d)", n_programs);
+	} else {
+		for (i = 0; i < n_programs; ++i) {
+			gint r;
+			r = b25->get_program_info(b25, &info, i);
+			if (r < 0) {
+				g_warning("!!! ARIB_STD_B25::get_program_info(%d) (%d)", i, r);
+			} else {
+				g_message("> CH:%5d unpurchased ECM:%d(%04x)"
+						  " undecrypted TS:%8"G_GINT64_FORMAT"/%8"G_GINT64_FORMAT" (%.3f%%)",
+						  info.program_number,
+						  info.ecm_unpurchased_count,
+						  info.last_ecm_error_code,
+						  info.undecrypted_packet_count,
+						  info.total_packet_count,
+						  (gdouble)info.undecrypted_packet_count / info.total_packet_count * 100);
+			}
+		}
+	}
 }
 
 static void
@@ -557,6 +586,42 @@ run(void)
 
 		if (device) cusbfx2_close(device);
 		if (is_cusbfx2_inited) cusbfx2_exit();
+	}
+
+	/* flush */
+	if (st_b25) {
+		gint r;
+		ARIB_STD_B25_BUFFER buffer;
+
+		if (st_b25_queue) {
+			gpointer chunk;
+			while (chunk = g_queue_pop_head(st_b25_queue)) {
+				gsize size = *(gsize *)chunk;
+				proc_b25((gpointer)(((gsize *)chunk) + 1), size);
+				g_slice_free1(sizeof(gsize) + size, chunk);
+				st_b25_queue_size -= size;
+			}
+		}
+
+		r = st_b25->flush(st_b25);
+		if (r < 0) {
+			g_warning("!!! ARIB_STD_B25::flush() failed (%d)", r);
+		}
+
+		r = st_b25->get(st_b25, &buffer);
+		if (r < 0) {
+			g_warning("!!! b25->get %d", r);
+		} else if (buffer.size > 0) {
+			GError *error = NULL;
+			gsize written;
+			g_io_channel_write_chars(st_b25_output_io, buffer.data, buffer.size, &written, &error);
+			if (error) {
+				g_warning("!!! %s", error->message);
+				g_clear_error(&error);
+			}
+		}
+
+		info_b25(st_b25);
 	}
 
 	release_b25();
