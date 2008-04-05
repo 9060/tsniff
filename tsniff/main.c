@@ -48,7 +48,7 @@ static GOptionEntry st_ir_options[] = {
 	  "Set IR base channel to N (1..3) [1]", "N" },
 	{ "ir-source", 's', 0, G_OPTION_ARG_INT, &st_ir_source,
 	  "Set tuner source to N (0:Terestrial 1:BS 2:CS)", "N" },
-	{ "ir-channel", 'c', 0, G_OPTION_ARG_INT, &st_ir_channel,
+	{ "ir-channel", 'c', 0, G_OPTION_ARG_STRING, &st_ir_channel,
 	  "Set tuner channel to C (1..12 or 000...999)", "C" },
 	{ NULL }
 };
@@ -224,7 +224,9 @@ transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 			B25Chunk *chunk;
 			
 			if (st_bcas_input_type == INPUT_TYPE_FX2) {
-				if (((PSEUDO_B_CAS_CARD *)st_bcas)->get_queue_current_len(st_bcas) == 0)
+				PseudoBCASStatus status;
+				((PSEUDO_B_CAS_CARD *)st_bcas)->get_status(st_bcas, &status);
+				if (status.n_ecm_arrived == 0)
 					return st_is_running;
 			}
 
@@ -429,7 +431,7 @@ run(void)
 	GTimer *timer; 
 	gboolean is_cusbfx2_inited = FALSE;
 	gboolean is_cusbfx2_started = FALSE;
-	GString *status = NULL;
+	GString *infoline = NULL;
 	gdouble ts_disposed_time;
 
 	/* Initialize inputs */
@@ -552,7 +554,7 @@ run(void)
 	}
 
 	/* main loop */
-	status = g_string_sized_new(128);
+	infoline = g_string_sized_new(128);
 	timer = g_timer_new();
 	ts_disposed_time = -1.;
 	while (st_is_running) {
@@ -581,19 +583,21 @@ run(void)
 			elapsed = g_timer_elapsed(timer, NULL);
 
 			if (st_b25_queue && st_bcas_input_type == INPUT_TYPE_FX2 && ts_disposed_time < .0) {
-				if (((PSEUDO_B_CAS_CARD *)st_bcas)->get_queue_current_len(st_bcas) > 0) {
+				PseudoBCASStatus info;
+				((PSEUDO_B_CAS_CARD *)st_bcas)->get_status(st_bcas, &info);
+				if (info.n_ecm_arrived > 0) {
 					ts_disposed_time = elapsed;
 					g_message("*** dispose leading TS stream by %.1f seconds", ts_disposed_time);
 				}
 			}
 
-			g_string_printf(status, ">>> Now:%.1f ", elapsed);
+			g_string_printf(infoline, ">>> Now:%.1f ", elapsed);
 			if (st_b25_queue) {
-				g_string_append_printf(status, "TSbuf:%.2fM(%3d%%)",
+				g_string_append_printf(infoline, "TSbuf:%.2fM(%3d%%)",
 									   (gdouble)st_b25_queue_size / (1024 * 1024),
 									   (gsize)((gdouble)st_b25_queue_size / MAX_B25_QUEUE_SIZE * 100));
 			}
-			g_fprintf(stderr, "%s\r", status->str);
+			g_fprintf(stderr, "%s\r", infoline->str);
 
 			if (st_length > 0 && elapsed > st_length) {
 				break;
@@ -601,7 +605,7 @@ run(void)
 		}
 	}
 	g_fprintf(stderr, "\n");
-	if (status) g_string_free(status, TRUE);
+	if (infoline) g_string_free(infoline, TRUE);
 	g_timer_destroy(timer);
 
 	if (st_is_running) {
@@ -610,6 +614,30 @@ run(void)
 		g_message("### INTERRUPTED SHUTDOWN ###");
 	}
 	st_is_running = FALSE;
+
+	/* TS転送を止め、対応するであろう鍵を受け取るまで待つ */
+	if (st_b25_queue && st_bcas_input_type == INPUT_TYPE_FX2 && ts_disposed_time > .0) {
+		g_message("*** waiting for last ECM");
+		if (transfer_ts) {
+			cusbfx2_free_transfer(transfer_ts);
+			transfer_ts = NULL;
+		}
+
+		st_is_running = TRUE;
+		PseudoBCASStatus before_status, status;
+		((PSEUDO_B_CAS_CARD *)st_bcas)->get_status(st_bcas, &before_status);
+		status = before_status;
+		while (status.n_ecm_arrived < before_status.n_ecm_arrived + 1) {
+			cusbfx2_poll();
+			((PSEUDO_B_CAS_CARD *)st_bcas)->get_status(st_bcas, &status);
+		}
+		st_is_running = FALSE;
+
+		if (transfer_bcas) {
+			cusbfx2_free_transfer(transfer_bcas);
+			transfer_bcas = NULL;
+		}
+	}
 
  quit:
 	/* finalize */

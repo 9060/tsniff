@@ -26,6 +26,7 @@ typedef struct Context {
 	BCASStream *stream;
 	GQueue *ecm_queue;
 	guint ecm_queue_len;
+	guint n_ecm_arrived;
 
 	ECMPacket *pending_ecm_packet;
 	gint response_delay;
@@ -126,6 +127,7 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 				g_slice_free(ECMPacket, g_queue_pop_head(self->ecm_queue));
 			}
 
+			++self->n_ecm_arrived;
 			self->pending_ecm_packet = NULL;
 		}
 	}
@@ -160,6 +162,7 @@ init_b_cas_card(void *bcas)
 	self->is_init_status_valid = FALSE;
 	self->ecm_queue = g_queue_new();
 	self->ecm_queue_len = 128;
+	self->n_ecm_arrived = 0;
 	self->stream = bcas_stream_new();
 	self->pending_ecm_packet = NULL;
 	self->response_delay = 0;
@@ -279,11 +282,13 @@ set_queue_len(void *bcas, guint len)
 	self->ecm_queue_len = len;
 }
 
-static gsize
-get_queue_current_len(void *bcas)
+static void
+get_status(void *bcas, PseudoBCASStatus *status)
 {
 	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
-	return self->ecm_queue->length;
+	g_assert(status);
+	status->current_ecm_queue_len = self->ecm_queue->length;
+	status->n_ecm_arrived = self->n_ecm_arrived;
 }
 
 static void
@@ -310,9 +315,9 @@ pseudo_bcas_new(void)
 
 	r->push = push;
 	r->set_queue_len = set_queue_len;
-	r->get_queue_current_len = get_queue_current_len;
 	r->set_init_status = set_init_status;
 	r->set_init_status_from_hex = set_init_status_from_hex;
+	r->get_status = get_status;
 
 	return r;
 }
