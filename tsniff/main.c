@@ -466,7 +466,6 @@ run(void)
 
 	install_sighandler();
 
-	/* main loop */
 	/* B-CAS 入力がファイルであれば、事前に読んでおく */
 	if (st_bcas_input_io) {
 		for (;;) {
@@ -496,6 +495,7 @@ run(void)
 		}
 	}
 
+	/* main loop */
 	timer = g_timer_new();
 	while (st_is_running) {
 		gdouble elapsed;
