@@ -564,6 +564,7 @@ run(void)
 
 	if (st_is_use_cusbfx2) {
 		if (is_cusbfx2_started) {
+			g_message("*** set CUSBFX2 to idle mode");
 			if (transfer_ts) capsts_cmd_push(CMD_EP6IN_STOP);
 			if (transfer_bcas) capsts_cmd_push(CMD_EP4IN_STOP);
 			capsts_cmd_push(CMD_MODE_IDLE);
@@ -586,6 +587,8 @@ run(void)
 
 		if (st_b25_queue) {
 			gpointer chunk;
+
+			g_message("*** flush TS time-shift buffer");
 			while (chunk = g_queue_pop_head(st_b25_queue)) {
 				gsize size = *(gsize *)chunk;
 				proc_b25((gpointer)(((gsize *)chunk) + 1), size);
@@ -595,6 +598,7 @@ run(void)
 			g_queue_free(st_b25_queue);
 		}
 
+		g_message("*** flush B25 decoder");
 		r = st_b25->flush(st_b25);
 		if (r < 0) {
 			g_warning("!!! ARIB_STD_B25::flush failed (%d)", r);
