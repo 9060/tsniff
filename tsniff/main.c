@@ -320,7 +320,6 @@ init_b25(void)
 	if (is_pseudo_bcas) {
 		if (!((PSEUDO_B_CAS_CARD *)st_bcas)->set_init_status_from_hex(st_bcas, st_b25_system_key, st_b25_init_cbc)) {
 			g_critical("!!! B-CAS SYSTEM KEY AND INIT-CBC NOT SUPPLIED");
-			st_bcas->release(st_bcas);
 			return FALSE;
 		}
 
@@ -336,7 +335,6 @@ init_b25(void)
 	st_b25 = create_arib_std_b25();
 	if (!st_b25) {
 		g_critical("!!! couldn't create B25 decoder");
-		st_bcas->release(st_bcas);
 		return FALSE;
 	}
 
@@ -355,17 +353,6 @@ init_b25(void)
 	}
 
 	return TRUE;
-}
-
-static void
-release_b25(void)
-{
-	if (st_b25_queue) {
-		/* TODO: free chunks */
-		g_queue_free(st_b25_queue);
-	}
-	if (st_b25) st_b25->release(st_b25);
-	if (st_bcas) st_bcas->release(st_bcas);
 }
 
 static void
@@ -605,6 +592,7 @@ run(void)
 				g_slice_free1(sizeof(gsize) + size, chunk);
 				st_b25_queue_size -= size;
 			}
+			g_queue_free(st_b25_queue);
 		}
 
 		r = st_b25->flush(st_b25);
@@ -626,9 +614,10 @@ run(void)
 		}
 
 		info_b25(st_b25);
-	}
 
-	release_b25();
+		if (st_b25) st_b25->release(st_b25);
+		if (st_bcas) st_bcas->release(st_bcas);
+	}
 
 	if (st_b25_output_io) g_io_channel_shutdown(st_b25_output_io, TRUE, NULL);
 	if (st_bcas_output_io) g_io_channel_shutdown(st_bcas_output_io, TRUE, NULL);
