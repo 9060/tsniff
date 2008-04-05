@@ -73,6 +73,7 @@ static gchar *st_bcas_input = BCAS_INPUT_FX2_PREFIX;
 static gchar *st_ts_output = NULL;
 static gchar *st_bcas_output = NULL;
 static gchar *st_b25_output = NULL;
+static gint st_length = -1;
 static gboolean st_is_verbose = FALSE;
 static gboolean st_is_quiet = FALSE;
 static gint st_verify_bcas_stream = -1;
@@ -80,7 +81,7 @@ static GOptionEntry st_main_options[] = {
 	{ "ts-input", 'T', 0, G_OPTION_ARG_FILENAME, &st_ts_input,
 	  "Input MPEG2-TS from SOURCE (" BCAS_INPUT_FX2_PREFIX " or FILENAME) [" BCAS_INPUT_FX2_PREFIX "]", "SOURCE" },
 	{ "bcas-input", 'B', 0, G_OPTION_ARG_FILENAME, &st_bcas_input,
-	  "Input B-CAS from SOURCE (" BCAS_INPUT_FX2_PREFIX " or " BCAS_INPUT_PCSC_PREFIX " or FILENAME) [" BCAS_INPUT_FX2_PREFIX ":]", "SOURCE" },
+	  "Input B-CAS from SOURCE (" BCAS_INPUT_FX2_PREFIX " or " BCAS_INPUT_PCSC_PREFIX " or FILENAME) [" BCAS_INPUT_FX2_PREFIX "]", "SOURCE" },
 
 	{ "ts-output", 't', 0, G_OPTION_ARG_FILENAME, &st_ts_output,
 	  "Output raw MPEG2-TS to FILENAME", "FILENAME" },
@@ -88,6 +89,9 @@ static GOptionEntry st_main_options[] = {
 	  "Output B-CAS to FILENAME", "FILENAME" },
 	{ "b25-output", 'o', 0, G_OPTION_ARG_FILENAME, &st_b25_output,
 	  "Enable ARIB STD-B25 decoder and output to FILENAME", "FILENAME" },
+
+	{ "length", 'l', 0, G_OPTION_ARG_INT, &st_length,
+	  "Stop sniffing when N seconds passed, if input was CUSBFX2 [infinite]", "N" },
 
 	{ "verbose", 'v', 0, G_OPTION_ARG_NONE, &st_is_verbose,
 	  "Verbose messages [disabled]", NULL },
@@ -549,7 +553,8 @@ run(void)
 					  elapsed,
 					  st_b25_queue_size,
 					  (gsize)((gdouble)st_b25_queue_size / st_b25_queue_max * 100));
-			if (elapsed > 180.0) {
+
+			if (elapsed > st_length) {
 				break;
 			}
 		}
