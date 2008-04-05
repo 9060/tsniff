@@ -52,19 +52,19 @@ FILENAME には標準入力または標準出力として、"-" を指定する�
 
   -T, --ts-input=SOURCE
       TS データ入力を SOURCE に設定します。SOURCE は以下の値を取ります。
-      省略時のデフォルトは "fx2:" です。
+      省略時のデフォルトは fx2: です。
 
-        "fx2:"   - CUSBFX2 から TS を取得します。
+        fx2:     - CUSBFX2 から TS を取得します。
         FILENAME - ファイルから TS を取得します。
 
   -B, --bcas-input SOURCE
       B-CAS データ入力を SOURCE に設定します。SOURCE は以下の値を取ります。
-      省略時のデフォルトは "fx2:" です。
+      省略時のデフォルトは fx2: です。
 
-        "fx2:"   - CUSBFX2 から B-CAS データを取得します。
-        "pcsc:"  - libpcsclite 経由でカードリーダから B-CAS データを取得します。
+        fx2:     - CUSBFX2 から B-CAS データを取得します。
+        pcsc:    - libpcsclite 経由でカードリーダから B-CAS データを取得します。
                    --bcas-output, --verify-bcas-stream との併用はできません。
-        FILENAME - ファイルから B-CAS データを取得します。
+        FILENAME - 初期化の際にファイルから全ての B-CAS データを取得します。
 
   -t, --ts-output=FILENAME
       未加工 TS データを FILENAME へ出力します。
@@ -74,6 +74,8 @@ FILENAME には標準入力または標準出力として、"-" を指定する�
 
   -o, --b25-output=FILENAME
       ARIB STD-B25 デコーダを有効にし、デコード済み TS データを FILENAME へ出力します。
+
+一部組み合わせではまともに動作しないかもしれません。
 
 B-CAS 初期データ
 ----------------
@@ -192,15 +194,10 @@ TODO
  * 時間ベースのTS遅延バッファサイズ指定
  * 終了時の各種バッファのフラッシュ
  * 終了時の各種バッファとインスタンスの解放
- * カードリーダーを使えるようにする
-   * B-CAS 初期データをダンプする
- * 各種入力ソースと動作モードの整理
-   * TS ← FX2 / ファイル
-   * B-CAS ← FX2 / ファイル / カードリーダー
-   * TS → Rawファイル(STDOUT) / Decodedファイル(STDOUT)
-   * B-CAS → ファイル(STDOUT)
+ * B-CAS 初期データをダンプする
  * ログをファイルに出力
  * 最初のECM鍵が到着するまでTSをsniffしない? その場合は無効区間をログ出力
+ * 末尾のECMエラーの回避
  * VLCの input module
  * mplayerの input module
  * EP4INのパケットサイズを可変にする(ファームウェアのパッチ当て)
