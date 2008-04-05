@@ -76,6 +76,7 @@ static gchar *st_b25_output = NULL;
 static gint st_length = -1;
 static gboolean st_is_verbose = FALSE;
 static gboolean st_is_quiet = FALSE;
+static gboolean st_dump_bcas_init_status = FALSE;
 static gint st_verify_bcas_stream = -1;
 static GOptionEntry st_main_options[] = {
 	{ "ts-input", 'T', 0, G_OPTION_ARG_FILENAME, &st_ts_input,
@@ -98,6 +99,8 @@ static GOptionEntry st_main_options[] = {
 	{ "quiet", 'q', 0, G_OPTION_ARG_NONE, &st_is_quiet,
 	  "Quiet messages [disabled]", NULL },
 
+	{ "dump-bcas-init-status", 0, 0, G_OPTION_ARG_NONE, &st_dump_bcas_init_status,
+	  "Dump B-CAS init-status to STDOUT", NULL },
 	{ "verify-bcas-stream", 0, OPTION_FLAG_DEBUG, G_OPTION_ARG_INT, &st_verify_bcas_stream,
 	  "Verify B-CAS stream CHUNK_SIZE=N (1-512)", "N" },
 	{ NULL }
@@ -634,6 +637,58 @@ run(void)
 	if (st_ts_input_io) g_io_channel_shutdown(st_ts_input_io, TRUE, NULL);
 }
 
+static GString *
+hexdump(guint8 *data, guint len, gboolean is_seperate)
+{
+	GString *result;
+	guint i;
+
+	result = g_string_sized_new(len * 3);
+	for (i = 0; i < len; ++i) {
+		g_string_append_printf(result, "%s%02x", ((i == 0 || !is_seperate) ? "" : " "), data[i]);
+	}
+	return result;
+}
+
+static void
+dump_bcas_init_status()
+{
+	gint r;
+	B_CAS_INIT_STATUS init;
+	GString *hex;
+
+	st_bcas = create_b_cas_card();
+	if (!st_bcas) {
+		g_critical("!!! couldn't create B-CAS card reader");
+		goto quit;
+	}
+
+	r = st_bcas->init(st_bcas);
+	if (r < 0) {
+		g_critical("!!! couldn't initialize B-CAS card reader (%d)", r);
+		goto quit;
+	}
+
+	r = st_bcas->get_init_status(st_bcas, &init);
+	if (r < 0) {
+		g_critical("!!! couldn't get B-CAS init status (%d)", r);
+		goto quit;
+	}
+
+	g_fprintf(stdout, "[b25]\n");
+
+	hex = hexdump(init.system_key, 32, FALSE);
+	g_fprintf(stdout, "system_key = %s\n", hex->str);
+	g_string_free(hex, TRUE);
+
+	hex = hexdump(init.init_cbc, 8, FALSE);
+	g_fprintf(stdout, "init_cbc = %s\n", hex->str);
+	g_string_free(hex, TRUE);
+
+ quit:
+	if (st_bcas) st_bcas->release(st_bcas);
+}
+
 /**
  * --verify-bcas-stream=N と --bcas-filename=FILENAME が指定されて場合に実行される。
  *
@@ -795,7 +850,9 @@ main(int argc, char **argv)
 		return 1;
 	}
 
-	if (st_verify_bcas_stream > 0) {
+	if (st_dump_bcas_init_status) {
+		dump_bcas_init_status();
+	} else if (st_verify_bcas_stream > 0) {
 		verify_bcas_stream();
 	} else {
 		run();

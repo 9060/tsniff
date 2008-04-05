@@ -97,10 +97,10 @@ B-CAS 初期データは、オプションで指定するか、設定ファイ�
    system_key = 00112233445566778899AABBCCDDEEFF00112233445566778899aabbccddeeff
    init_cbc = 0011223344556677
 
-なお、B-CAS 初期データは --b25-dump-init-status で取得できます。
+なお、B-CAS 初期データは --dump-bcas-init-status で取得できます。
 そのまま設定ファイルとして利用するのが良いでしょう。
 
- $ tsniff --b25-dump-init-status >$HOME/.config/tsniff.conf
+ $ tsniff --dump-bcas-init-status >$HOME/.config/tsniff.conf
 
 その他
 ------
