@@ -16,6 +16,7 @@ typedef struct ECMPacket {
 	/* Responed packet */
 	guint16 flag;
 	guint8 key[BCAS_ECM_PACKET_KEY_SIZE];
+	GTimeVal arrived_time;
 } ECMPacket;
 
 typedef struct Context {
@@ -112,6 +113,7 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 			self->pending_ecm_packet->flag = 
 				(packet->payload[BCAS_ECM_PACKET_FLAGS_INDEX] << 8) | packet->payload[BCAS_ECM_PACKET_FLAGS_INDEX + 1];
 			memcpy(self->pending_ecm_packet->key, &packet->payload[BCAS_ECM_PACKET_KEY_INDEX], BCAS_ECM_PACKET_KEY_SIZE);
+			g_get_current_time(&self->pending_ecm_packet->arrived_time);
 
 			/* ECMキューに追加 */
 			ecm_dump = hexdump(self->pending_ecm_packet->data, self->pending_ecm_packet->len, FALSE);
@@ -217,11 +219,17 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 	}
 
 	if (ecm) {
+		GTimeVal now;
+		gdouble diff;
+
 		memcpy(dst->scramble_key, ecm->key, BCAS_ECM_PACKET_KEY_SIZE);
 		dst->return_code = ecm->flag;
 
+		g_get_current_time(&now);
+		diff = (now.tv_sec - ecm->arrived_time.tv_sec) + (((gdouble)now.tv_usec - ecm->arrived_time.tv_usec) / 1000000);
+
 		ecm_dump = hexdump(ecm->data, ecm->len, FALSE);
-		g_debug("[pseudo_bcas] ECM found  [%s]", ecm_dump->str);
+		g_debug("[pseudo_bcas] ECM found  [%s] (%+.3f)", ecm_dump->str, diff);
 		g_string_free(ecm_dump, TRUE);
 	} else {
 		ecm_dump = hexdump(src_packet.data, src_packet.len, FALSE);
