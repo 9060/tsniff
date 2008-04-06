@@ -315,13 +315,12 @@ $ sudo aptitude install libglib2.0-dev libpcsclite-dev
 <pre class="literal-block">
 $ hg clone http://atty.skr.jp/hg/tsniff
 $ cd tsniff
-$ ./autogen.sh
 </pre>
 </li>
 <li><p class="first">libusb-1.0 を入手し、bootstrap を実行します:</p>
 <pre class="literal-block">
 $ git clone git://projects.reactivated.net/~dsd/libusb.git extra/libusb
-$ ( cd extra/libusb &amp;&amp; patch -p1 ../libusb.patch &amp;&amp; ./autogen.sh )
+$ ( cd extra/libusb &amp;&amp; patch -p1 &lt;../libusb.patch &amp;&amp; ./autogen.sh )
 </pre>
 </li>
 <li><p class="first">arib_std_b25-atty を入手し、bootstrap を実行します:</p>
@@ -634,12 +633,15 @@ $ tsniff --dump-bcas-init-status &gt;$HOME/.config/tsniff.conf
 <li>HP ProLiant ML115 (Athlon 64 3200+ / 512MB)</li>
 <li>Ubuntu Linux 7.10 (i386)</li>
 <li>YAGI DTC110</li>
+<li>libusb: d9b2ce2894ed43d34de6850f2dac50ccabf1db55</li>
+<li>arib_std_b25-atty: 1d4752d3156f</li>
 </ul>
 </div>
 </div>
 <div class="section">
 <h1><a id="todo" name="todo">TODO</a></h1>
 <ul class="simple">
+<li>終了ステータス (エラーの有無)</li>
 <li>ポータビリティの向上(*BSD, MacOSX, ... Windows はしらね)</li>
 <li>VLC の input module にする</li>
 <li>mplayer の input module にする</li>
