@@ -223,8 +223,8 @@ cusbfx2_open(guint8 id, guint8 *firmware, const gchar *firmware_id, gboolean is_
 
 		manufacturer = cusbfx2_get_manufacturer(usb_handle);
 		if (!is_force_load && !strcmp(manufacturer, firmware_id)) {
-			g_free(manufacturer);
 			g_message("[cusbfx2_open] required firmware <%s> is already loaded", manufacturer);
+			g_free(manufacturer);
 		} else {
 			g_free(manufacturer);
 			if (is_force_load) g_message("[cusbfx2_open] force reload firmware");
