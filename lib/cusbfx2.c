@@ -36,7 +36,7 @@ cusbfx2_get_manufacturer(libusb_device_handle *handle)
 	string_descriptor *desc;
 	guint8 buf[256], result[256];
 	gint i;
-	struct libusb_device_descriptor *device = libusb_get_device_descriptor(libusb_get_device(handle));
+	const struct libusb_device_descriptor *device = libusb_get_device_descriptor(libusb_get_device(handle));
 	libusb_control_transfer(handle, LIBUSB_RECIPIENT_DEVICE|LIBUSB_REQUEST_TYPE_STANDARD|LIBUSB_ENDPOINT_IN,
 							LIBUSB_REQUEST_GET_DESCRIPTOR,
 							(LIBUSB_DT_STRING << 8) | device->iManufacturer,
@@ -72,7 +72,7 @@ cusbfx2_find_open(guint8 id)
 
 	/* 接続されている全てのUSBデバイスを調べる */
 	while ((device = devices[i++])) {
-		struct libusb_device_descriptor *desc = libusb_get_device_descriptor(device);
+		const struct libusb_device_descriptor *desc = libusb_get_device_descriptor(device);
 
 /* 		g_debug("[cusbfx2_find_open] %d:idVendor=0x%04x, idProduct=0x%04x, bcdDevice=0x%04x", */
 /* 				i - 1, desc->idVendor, desc->idProduct, desc->bcdDevice); */
@@ -375,7 +375,7 @@ cusbfx2_init_bulk_transfer(cusbfx2_handle *h, const gchar *name, guint8 endpoint
 		gpointer buffer;
 		gint r;
 
-		usb_transfer = libusb_alloc_transfer();
+		usb_transfer = libusb_alloc_transfer(0);
 		if (!usb_transfer) {
 			g_critical("[cusbfx2_init_bulk_transfer] %s: libusb_alloc_transfer failed", name);
 			continue;
@@ -472,5 +472,5 @@ cusbfx2_free_transfer(cusbfx2_transfer *transfer)
 int
 cusbfx2_poll(void)
 {
-	return libusb_poll();
+	return libusb_handle_events();
 }
