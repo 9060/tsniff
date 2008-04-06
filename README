@@ -296,6 +296,8 @@ tsniff.conf::
 * HP ProLiant ML115 (Athlon 64 3200+ / 512MB)
 * Ubuntu Linux 7.10 (i386)
 * YAGI DTC110
+* libusb: d9b2ce2894ed43d34de6850f2dac50ccabf1db55
+* arib_std_b25-atty: 1d4752d3156f
 
 
 TODO
