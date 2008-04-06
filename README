@@ -29,12 +29,11 @@ INSTALL
 
    $ hg clone http://atty.skr.jp/hg/tsniff
    $ cd tsniff
-   $ ./autogen.sh
 
 3. libusb-1.0 を入手し、bootstrap を実行します::
 
    $ git clone git://projects.reactivated.net/~dsd/libusb.git extra/libusb
-   $ ( cd extra/libusb && patch -p1 ../libusb.patch && ./autogen.sh )
+   $ ( cd extra/libusb && patch -p1 <../libusb.patch && ./autogen.sh )
 
 4. arib_std_b25-atty を入手し、bootstrap を実行します::
 
@@ -302,6 +301,7 @@ tsniff.conf::
 TODO
 ====
 
+* 終了ステータス (エラーの有無)
 * ポータビリティの向上(\*BSD, MacOSX, ... Windows はしらね) 
 * VLC の input module にする
 * mplayer の input module にする
