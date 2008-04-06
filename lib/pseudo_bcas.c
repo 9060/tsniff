@@ -118,7 +118,7 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 
 			/* ECMキューに追加 */
 			ecm_dump = hexdump(self->pending_ecm_packet->data, self->pending_ecm_packet->len, FALSE);
-			g_debug("[pseudo_bcas] ECM regist  [%s]", ecm_dump->str);
+			g_debug("[pseudo_bcas] ECM regist [%s]", ecm_dump->str);
 			g_string_free(ecm_dump, TRUE);
 
 			g_queue_push_tail(self->ecm_queue, self->pending_ecm_packet);
