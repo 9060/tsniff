@@ -34,8 +34,7 @@ INSTALL
 3. libusb-1.0 を入手し、bootstrap を実行します::
 
    $ git clone git://projects.reactivated.net/~dsd/libusb.git extra/libusb
-   [ autogen.sh から configure を実行する行を削除 ]
-   $ ( cd extra/libusb && ./autogen.sh )
+   $ ( cd extra/libusb && patch -p1 ../libusb.patch && ./autogen.sh )
 
 4. arib_std_b25-atty を入手し、bootstrap を実行します::
 

@@ -320,8 +320,8 @@ $ ./autogen.sh
 </li>
 <li><p class="first">libusb-1.0 を入手し、bootstrap を実行します:</p>
 <pre class="literal-block">
-$ git clone http://libusb-1.0 extra/libusb-1.0
-$ ( cd extra/libusb-1.0 &amp;&amp; ./autogen.sh )
+$ git clone git://projects.reactivated.net/~dsd/libusb.git extra/libusb
+$ ( cd extra/libusb &amp;&amp; patch -p1 ../libusb.patch &amp;&amp; ./autogen.sh )
 </pre>
 </li>
 <li><p class="first">arib_std_b25-atty を入手し、bootstrap を実行します:</p>
