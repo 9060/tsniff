@@ -328,7 +328,6 @@ cusbfx2_transfer_callback(struct libusb_transfer *usb_transfer)
 
 	case LIBUSB_TRANSFER_CANCELLED:
 		g_warning("[cusbfx2_transfer_callback] %s: canceled", transfer->name);
-		is_resubmit = FALSE;
 		break;
 
 	default:

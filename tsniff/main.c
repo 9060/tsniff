@@ -115,7 +115,7 @@ static GOptionEntry st_main_options[] = {
 };
 
 
-static gboolean st_is_running = TRUE;
+static gboolean st_is_intterupted = FALSE;
 static gboolean st_is_use_cusbfx2 = FALSE;
 static ARIB_STD_B25 *st_b25 = NULL;
 static B_CAS_CARD *st_bcas = NULL;
@@ -147,7 +147,7 @@ struct sigaction st_old_sigaction_sigquit;
 static void
 sighandler(int signum)
 {
-	st_is_running = FALSE;
+	st_is_intterupted = TRUE;
 }
 
 static void
@@ -227,7 +227,7 @@ transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 				PseudoBCASStatus status;
 				((PSEUDO_B_CAS_CARD *)st_bcas)->get_status(st_bcas, &status);
 				if (status.n_ecm_arrived == 0)
-					return st_is_running;
+					return !st_is_intterupted;
 			}
 
 			g_get_current_time(&now);
@@ -268,7 +268,7 @@ transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 		}
 	}
 
-	return st_is_running;
+	return !st_is_intterupted;
 }
 
 static gboolean
@@ -288,7 +288,7 @@ transfer_bcas_cb(gpointer data, gint length, gpointer user_data)
 		}
 	}
 
-	return st_is_running;
+	return TRUE;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -557,7 +557,7 @@ run(void)
 	infoline = g_string_sized_new(128);
 	timer = g_timer_new();
 	ts_disposed_time = -1.;
-	while (st_is_running) {
+	while (!st_is_intterupted) {
 		gdouble elapsed;
 
 		if (st_ts_input_io) {
@@ -608,32 +608,34 @@ run(void)
 	if (infoline) g_string_free(infoline, TRUE);
 	g_timer_destroy(timer);
 
-	if (st_is_running) {
-		g_message("### FINISHED SHUTDOWN ###");
-	} else {
+	if (st_is_intterupted) {
 		g_message("### INTERRUPTED SHUTDOWN ###");
+	} else {
+		g_message("### FINISHED SHUTDOWN ###");
 	}
-	st_is_running = FALSE;
 
 	/* TS転送を止め、対応するであろう鍵を受け取るまで待つ */
 	if (st_b25_queue && st_bcas_input_type == INPUT_TYPE_FX2 && ts_disposed_time > .0) {
 		g_message("*** waiting for last ECM");
 		if (transfer_ts) {
+			capsts_cmd_push(CMD_EP6IN_STOP);
+			capsts_cmd_commit(device);
 			cusbfx2_free_transfer(transfer_ts);
 			transfer_ts = NULL;
 		}
 
-		st_is_running = TRUE;
+		st_is_intterupted = FALSE;
 		PseudoBCASStatus before_status, status;
 		((PSEUDO_B_CAS_CARD *)st_bcas)->get_status(st_bcas, &before_status);
 		status = before_status;
-		while (status.n_ecm_arrived < before_status.n_ecm_arrived + 1) {
+		while (!st_is_intterupted && status.n_ecm_arrived < before_status.n_ecm_arrived + 1) {
 			cusbfx2_poll();
 			((PSEUDO_B_CAS_CARD *)st_bcas)->get_status(st_bcas, &status);
 		}
-		st_is_running = FALSE;
 
 		if (transfer_bcas) {
+			capsts_cmd_push(CMD_EP4IN_STOP);
+			capsts_cmd_commit(device);
 			cusbfx2_free_transfer(transfer_bcas);
 			transfer_bcas = NULL;
 		}
@@ -652,6 +654,10 @@ run(void)
 			capsts_cmd_commit(device);
 		}
 
+		if (st_is_intterupted) {
+			if (transfer_ts) cusbfx2_cancel_transfer_sync(transfer_ts);
+			if (transfer_bcas) cusbfx2_cancel_transfer_sync(transfer_bcas);
+		}
 		if (transfer_ts) cusbfx2_free_transfer(transfer_ts);
 		if (transfer_bcas) cusbfx2_free_transfer(transfer_bcas);
 
