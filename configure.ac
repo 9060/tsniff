@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT(tsniff, 0.0.1, atty303@gmail.com)
+AC_INIT(tsniff, 1.0.0, atty303@gmail.com)
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([tsniff/main.c])
 AC_CONFIG_HEADER([config.h])
@@ -29,10 +29,13 @@ AC_CHECK_HEADERS([stdlib.h string.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
+AC_STRUCT_TM
 AC_TYPE_UINT8_T
 
 # Checks for library functions.
 AC_FUNC_MEMCMP
+AC_FUNC_STRFTIME
+AC_CHECK_FUNCS([localtime_r memset])
 
 AC_CONFIG_SUBDIRS([extra/libusb extra/b25])
 AC_CONFIG_FILES([Makefile lib/Makefile extra/Makefile tsniff/Makefile])
