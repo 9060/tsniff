@@ -21,9 +21,9 @@ ABOUT
 INSTALL
 =======
 
-1. libpcsclite をインストールします::
+1. 依存ライブラリをインストールします::
 
-   $ sudo aptitude install libpcsclite-dev
+   $ sudo aptitude install libglib2.0-dev libpcsclite-dev
 
 2. tsniff 入手し、bootstrap を実行します::
 
