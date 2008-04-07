@@ -8,6 +8,9 @@ extern "C" {
 typedef struct PseudoBCASStatus {
 	gsize current_ecm_queue_len;
 	guint n_ecm_arrived;
+	guint n_ecm_failure;
+	gdouble min_ecm_latecy;
+	gdouble max_ecm_latecy;
 } PseudoBCASStatus;
 
 /*

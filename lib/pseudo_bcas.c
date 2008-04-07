@@ -26,7 +26,8 @@ typedef struct Context {
 	BCASStream *stream;
 	GQueue *ecm_queue;
 	guint ecm_queue_len;
-	guint n_ecm_arrived;
+
+	PseudoBCASStatus status;
 
 	ECMPacket *pending_ecm_packet;
 	gint response_delay;
@@ -127,7 +128,7 @@ parse_packet(const BCASPacket *packet, gboolean is_first_sync, gpointer user_dat
 				g_slice_free(ECMPacket, g_queue_pop_head(self->ecm_queue));
 			}
 
-			++self->n_ecm_arrived;
+			++self->status.n_ecm_arrived;
 			self->pending_ecm_packet = NULL;
 		}
 	}
@@ -162,10 +163,15 @@ init_b_cas_card(void *bcas)
 	self->is_init_status_valid = FALSE;
 	self->ecm_queue = g_queue_new();
 	self->ecm_queue_len = 128;
-	self->n_ecm_arrived = 0;
 	self->stream = bcas_stream_new();
 	self->pending_ecm_packet = NULL;
 	self->response_delay = 0;
+
+	self->status.current_ecm_queue_len = 0;
+	self->status.n_ecm_arrived = 0;
+	self->status.n_ecm_failure = 0;
+	self->status.min_ecm_latecy = .0;
+	self->status.max_ecm_latecy = .0;
 
 	return 0;
 }
@@ -239,11 +245,17 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 
 		g_get_current_time(&now);
 		diff = (now.tv_sec - ecm->arrived_time.tv_sec) + (((gdouble)now.tv_usec - ecm->arrived_time.tv_usec) / 1000000);
+		if (self->status.max_ecm_latecy == .0 || diff > self->status.max_ecm_latecy)
+			self->status.max_ecm_latecy = diff;
+		if (self->status.min_ecm_latecy == .0 || diff < self->status.min_ecm_latecy)
+			self->status.min_ecm_latecy = diff;
 
 		ecm_dump = hexdump(ecm->data, ecm->len, FALSE);
 		g_debug("[pseudo_bcas] ECM found  [%s] (%+.3f)", ecm_dump->str, diff);
 		g_string_free(ecm_dump, TRUE);
 	} else {
+		++self->status.n_ecm_failure;
+
 		ecm_dump = hexdump(src_packet.data, src_packet.len, FALSE);
 		g_warning("[pseudo_bcas] ECM FAILED [%s]", ecm_dump->str);
 		g_string_free(ecm_dump, TRUE);
@@ -301,8 +313,9 @@ get_status(void *bcas, PseudoBCASStatus *status)
 {
 	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
 	g_assert(status);
-	status->current_ecm_queue_len = self->ecm_queue->length;
-	status->n_ecm_arrived = self->n_ecm_arrived;
+
+	self->status.current_ecm_queue_len = self->ecm_queue->length;
+	*status = self->status;
 }
 
 static void

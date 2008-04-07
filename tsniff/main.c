@@ -577,23 +577,30 @@ run(void)
 				break;
 			}
 		} else if (is_cusbfx2_started) {
+			PseudoBCASStatus bcas_status;
+			if (st_bcas_input_type == INPUT_TYPE_FX2 || st_bcas_input_type == INPUT_TYPE_FILE) {
+				((PSEUDO_B_CAS_CARD *)st_bcas)->get_status(st_bcas, &bcas_status);
+			}
 
 			cusbfx2_poll();
 
 			elapsed = g_timer_elapsed(timer, NULL);
 
-			if (st_b25_queue && st_bcas_input_type == INPUT_TYPE_FX2 && ts_disposed_time < .0) {
-				PseudoBCASStatus info;
-				((PSEUDO_B_CAS_CARD *)st_bcas)->get_status(st_bcas, &info);
-				if (info.n_ecm_arrived > 0) {
+			if (st_b25_queue && ts_disposed_time < .0) {
+				if (bcas_status.n_ecm_arrived > 0) {
 					ts_disposed_time = elapsed;
 					g_message("*** dispose leading TS stream by %.1f seconds", ts_disposed_time);
 				}
 			}
 
-			g_string_printf(infoline, ">>> Now:%.1f ", elapsed);
+			g_string_printf(infoline, ">>> [Now] %.1f", elapsed);
+			if (st_bcas_input_type == INPUT_TYPE_FX2 || st_bcas_input_type == INPUT_TYPE_FILE) {
+				g_string_append_printf(infoline, " [ECM] fail:%d", bcas_status.n_ecm_failure);
+			}
 			if (st_b25_queue) {
-				g_string_append_printf(infoline, "TSbuf:%.2fM(%3d%%)",
+				g_string_append_printf(infoline, " latency:%.3f-%.3f",
+									   bcas_status.min_ecm_latecy, bcas_status.max_ecm_latecy);
+				g_string_append_printf(infoline, " [TS] capacity:%.2fM(%3d%%)",
 									   (gdouble)st_b25_queue_size / (1024 * 1024),
 									   (gsize)((gdouble)st_b25_queue_size / MAX_B25_QUEUE_SIZE * 100));
 			}
