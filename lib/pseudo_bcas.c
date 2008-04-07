@@ -203,6 +203,15 @@ static int get_init_status_b_cas_card(void *bcas, B_CAS_INIT_STATUS *stat)
 	}
 }
 
+static int get_id_b_cas_card(void *bcas, B_CAS_ID *dst)
+{
+	static int64_t data = 0;
+
+	dst->data = &data;
+	dst->count = 1;
+	return 0;
+}
+
 static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, int len)
 {
 	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
@@ -241,6 +250,11 @@ static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, 
 		return -1;
 	}
 
+	return 0;
+}
+
+static int proc_emm_b_cas_card(void *bcas, uint8_t *src, int len)
+{
 	return 0;
 }
 
@@ -311,7 +325,9 @@ pseudo_bcas_new(void)
 	r->super.release = release_b_cas_card;
 	r->super.init = init_b_cas_card;
 	r->super.get_init_status = get_init_status_b_cas_card;
+	r->super.get_id = get_id_b_cas_card;
 	r->super.proc_ecm = proc_ecm_b_cas_card;
+	r->super.proc_emm = proc_emm_b_cas_card;
 
 	r->push = push;
 	r->set_queue_len = set_queue_len;
