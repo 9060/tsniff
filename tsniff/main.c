@@ -486,7 +486,7 @@ run(void)
 			goto quit;
 		}
 
-		capsts_cmd_push(CMD_PORT_CFG, 0x00, PIO_START|PIO_IR_OUT|PIO_TS_BACK);
+		capsts_cmd_push(CMD_PORT_CFG, 0x00, PIO_START);
 		capsts_cmd_push(CMD_MODE_IDLE);
 		capsts_cmd_push(CMD_IFCONFIG, 0xE3);
 		capsts_cmd_commit(device);
@@ -517,7 +517,7 @@ run(void)
 			capsts_cmd_push(CMD_EP4IN_START);
 		}
 
-		capsts_cmd_push(CMD_PORT_WRITE, PIO_START|PIO_IR_OUT|PIO_TS_BACK);
+		capsts_cmd_push(CMD_PORT_WRITE, PIO_START);
 		capsts_cmd_commit(device);
 		is_cusbfx2_started = TRUE;
 	}
