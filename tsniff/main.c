@@ -515,6 +515,9 @@ run(void)
 		capsts_cmd_push(CMD_PORT_WRITE, PIO_START);
 		capsts_cmd_commit(device);
 		is_cusbfx2_started = TRUE;
+
+		if (transfer_ts) cusbfx2_start_transfer(transfer_ts);
+		if (transfer_bcas) cusbfx2_start_transfer(transfer_bcas);
 	}
 
 	install_sighandler();

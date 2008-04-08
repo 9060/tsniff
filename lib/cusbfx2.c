@@ -386,11 +386,12 @@ cusbfx2_init_bulk_transfer(cusbfx2_handle *h, const gchar *name, guint8 endpoint
 		buffer = g_malloc(length);
 		libusb_fill_bulk_transfer(usb_transfer, h->usb_handle, endpoint, buffer, length,
 								  cusbfx2_transfer_callback, transfer, CUSBFX2_TRANSFER_TIMEOUT);
-
+#if 0
 		r = libusb_submit_transfer(usb_transfer);
 		if (r) {
 			g_critical("[cusbfx2_init_bulk_transfer] %s: libusb_submit_transfer failed (%d)", name, r);
 		}
+#endif
 	}
 
 	g_message("[cusbfx2_init_bulk_transfer] %s: transfer started with %d x %d buffer", name, length, nqueues);
