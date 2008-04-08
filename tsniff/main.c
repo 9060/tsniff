@@ -28,6 +28,7 @@ static gint st_fx2_id = 0;		/* CUSBFX2のID */
 static gboolean st_fx2_is_force_load = FALSE; /* CUSBFX2のファームウェアを強制的にロードする */
 static gint st_fx2_ts_buffer_size = 16384;
 static gint st_fx2_ts_buffer_count = 16;
+static gint st_fx2_bcas_packet_size = 32;
 static GOptionEntry st_fx2_options[] = {
 	{ "fx2-id", 0, 0, G_OPTION_ARG_INT, &st_fx2_id,
 	  "Find CUSBFX2 it has ID N [0]", "N" },
@@ -37,6 +38,8 @@ static GOptionEntry st_fx2_options[] = {
 	  "Set TS transfer buffer size to N bytes [16384]", "N" },
 	{ "fx2-ts-buffer-count", 0, 0, G_OPTION_ARG_INT, &st_fx2_ts_buffer_size,
 	  "Set TS transfer buffer count to N [16]", "N" },
+	{ "fx2-bcas-packet-size", 0, 0, G_OPTION_ARG_INT, &st_fx2_bcas_packet_size,
+	  "Set B-CAS packet size to N bytes [32]", "N" },
 	{ NULL }
 };
 
@@ -481,6 +484,7 @@ run(void)
 			goto quit;
 		}
 
+		capsts_cmd_push(CMD_EP4AUTOINLEN, (st_fx2_bcas_packet_size >> 8) & 0xFF, st_fx2_bcas_packet_size & 0xFF);
 		capsts_cmd_push(CMD_PORT_CFG, 0x00, PIO_START);
 		capsts_cmd_push(CMD_MODE_IDLE);
 		capsts_cmd_push(CMD_IFCONFIG, 0xE3);
@@ -502,9 +506,9 @@ run(void)
 		}
 
 		if (st_bcas_input_type == INPUT_TYPE_FX2) {
-			g_message("*** setup B-CAS transfer");
+			g_message("*** setup B-CAS transfer (packet_size=%d)", st_fx2_bcas_packet_size);
 			transfer_bcas = cusbfx2_init_bulk_transfer(device, "B-CAS", ENDPOINT_BCAS_IN,
-													   32, 1, transfer_bcas_cb, NULL);
+													   st_fx2_bcas_packet_size, 4, transfer_bcas_cb, NULL);
 			if (!transfer_bcas) {
 				g_critical("!!! couldn't setup B-CAS transfer");
 				goto quit;
@@ -863,6 +867,8 @@ parse_options(int *argc, char ***argv)
 	if (!g_option_context_parse(context, argc, argv, &error)) {
 		return FALSE;
 	}
+
+	st_fx2_bcas_packet_size = CLAMP(st_fx2_bcas_packet_size, 1, 512);
 
 	st_ir_base = CLAMP(st_ir_base, 1, 3);
 	st_ir_source = CLAMP(st_ir_source, -1, 2);

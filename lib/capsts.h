@@ -73,6 +73,12 @@ enum {
 	 * @return 64 bytes
 	 */
 	CMD_IR_RBUF			= 0x5f,
+	/* 
+	 * @param msb
+	 * @param lsb
+	 * @return 64 bytes
+	 */
+	CMD_EP4AUTOINLEN	= 0x70,
 };
 
 enum {

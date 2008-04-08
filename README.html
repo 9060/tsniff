@@ -444,11 +444,20 @@ $ sudo make install
 <tr><td class="option-group" colspan="2">
 <kbd><span class="option">--fx2-ts-buffer-size=<var>N</var></span></kbd></td>
 </tr>
-<tr><td>&nbsp;</td><td>TS 転送バッファのサイズを N サイズに変更します。デフォルトは 16384 です。</td></tr>
+<tr><td>&nbsp;</td><td>TS 転送バッファのサイズを N バイトに変更します。デフォルトは 16384 です。</td></tr>
 <tr><td class="option-group" colspan="2">
 <kbd><span class="option">--fx2-ts-buffer-count=<var>N</var></span></kbd></td>
 </tr>
 <tr><td>&nbsp;</td><td>TS 転送の同時リクエスト数を N に変更します。デフォルトは 16 です。</td></tr>
+<tr><td class="option-group" colspan="2">
+<kbd><span class="option">--fx2-bcas-packet-size=<var>N</var></span></kbd></td>
+</tr>
+<tr><td>&nbsp;</td><td><p class="first">B-CAS データのパケットサイズを N バイトに変更します。
+1 〜 512 バイトが指定可能です。
+デフォルトは 32 です。</p>
+<p class="last">これは実験的なオプションです。現時点では面倒な制限があるため利用しないでください。
+将来的にはよりスマートな解決策を用意する予定です。</p>
+</td></tr>
 </tbody>
 </table>
 </div>
