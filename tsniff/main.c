@@ -247,11 +247,6 @@ transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 			while (chunk = g_queue_peek_head(st_b25_queue)) {
 				gdouble diff;
 
-				if (!chunk) {
-					/* empty */
-					break;
-				}
-
 				diff = now.tv_sec - chunk->arrived_time.tv_sec
 					+ (((gdouble)now.tv_usec - chunk->arrived_time.tv_usec) / 1000000);
 				if (diff < st_b25_ts_delay) {
@@ -682,11 +677,6 @@ run(void)
 
 			g_message("*** flush TS time-shift buffer");
 			while (chunk = g_queue_pop_head(st_b25_queue)) {
-				if (!chunk) {
-					/* empty */
-					break;
-				}
-
 				proc_b25(chunk + 1, chunk->size);
 
 				st_b25_queue_size -= chunk->size;
