@@ -21,32 +21,41 @@ ABOUT
 INSTALL
 =======
 
-1. 依存ライブラリをインストールします::
+ python 2.3
+ libusb 1.0
+ libpcsclite
+ glib 2.0
+ sdcc
+
+1. tsniff を入手します::
+
+   $ hg clone http://atty.skr.jp/hg/tsniff
+
+2. 依存ライブラリをインストールします::
 
    $ sudo aptitude install libglib2.0-dev libpcsclite-dev
 
-2. tsniff 入手し、bootstrap を実行します::
+3. libusb-1.0 を入手し、パッチを当て、インストールします::
 
-   $ hg clone http://atty.skr.jp/hg/tsniff
-   $ cd tsniff
+   $ git clone git://projects.reactivated.net/~dsd/libusb.git libusb-1.0
+   $ cd libusb-1.0
+   $ patch -p1 <../tsniff/extra/libusb.patch
+   $ ./autogen.sh
+   $ ./configure
+   $ make
+   $ sudo make install
+   $ cd ..
 
-3. libusb-1.0 を入手し、bootstrap を実行します::
+4. arib_std_b25-atty を入手し、tsniff のソースツリーに配置します::
 
-   $ git clone git://projects.reactivated.net/~dsd/libusb.git extra/libusb
-   $ ( cd extra/libusb && patch -p1 <../libusb.patch && ./autogen.sh )
-
-4. arib_std_b25-atty を入手し、bootstrap を実行します::
-
-   $ hg clone http://atty.skr.jp/hg/arib_std_b25-atty extra/b25
-   $ ( cd extra/b25 && ./autogen.sh )
+   $ hg clone http://atty.skr.jp/hg/arib_std_b25-atty tsniff/extra/arib_std_b25
 
 5. tsniff をビルド・インストールします::
 
-   $ ./autogen.sh
-   $ mkdir build; cd build
-   $ ../configure
-   $ make
-   $ sudo make install
+   $ cd tsniff
+   $ ./waf configure
+   $ ./waf
+   $ sudo ./waf install
 
 
 OPTIONS
@@ -306,6 +315,12 @@ tsniff.conf::
 * YAGI DTC110
 * libusb: d9b2ce2894ed43d34de6850f2dac50ccabf1db55
 * arib_std_b25-atty: 1d4752d3156f
+
+
+AUTHORS
+=======
+
+Koji Agawa <atty303@gmail.com>
 
 
 TODO

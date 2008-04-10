@@ -1,1 +1,0 @@
-SUBDIRS = extra lib tsniff
