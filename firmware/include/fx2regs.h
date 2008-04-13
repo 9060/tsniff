@@ -384,6 +384,16 @@ sfr at 0xAF AUTOPTRSETUP;
             sbit at 0xAF+2 APTR2FZ;
 
 sfr at 0xB0 IOD;
+         /*  IOD  */
+         sbit at 0xB0+0 PD0;
+         sbit at 0xB0+1 PD1;
+         sbit at 0xB0+2 PD2;
+         sbit at 0xB0+3 PD3;
+
+         sbit at 0xB0+4 PD4;
+         sbit at 0xB0+5 PD5;
+         sbit at 0xB0+6 PD6;
+         sbit at 0xB0+7 PD7;
 sfr at 0xB1 IOE;
 sfr at 0xB2 OEA;
 sfr at 0xB3 OEB;

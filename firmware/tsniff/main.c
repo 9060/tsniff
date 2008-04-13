@@ -37,6 +37,17 @@ BYTE Configuration;             // Current configuration
 BYTE AlternateSetting;          // Alternate settings
 BOOL enum_high_speed = FALSE;       // flag to let firmware know FX2 enumerated at high speed
 
+void timer_init();
+extern u16 us10_wait;
+
+u8 val_ifconfig;
+extern u16 ir_code;
+extern u8 xdata ir_rbuf[256];
+extern u8 xdata ir_wbuf[256];
+extern u8 ir_wbuf_len, ir_wbuf_idx;
+extern u8 ir_rbuf_idx;
+u8 ir_rbuf_idx_cpy;
+
 #define VR_NAKALL_ON    0xD0
 #define VR_NAKALL_OFF   0xD1
 
@@ -50,38 +61,62 @@ void TD_Init(void)             // Called once at startup
 	//	unsigned char i;
 
 	// set the CPU clock to 48MHz
-	CPUCS = ((CPUCS & ~bmCLKSPD) | bmCLKSPD1);
+	CPUCS = ((CPUCS & ~bmCLKSPD) | bmCLKSPD1 | bmCLKOE);
 	SYNCDELAY; 
+
+	//set FD bus 8bit
+	EP2FIFOCFG = 0x04;
+	SYNCDELAY;
+	EP4FIFOCFG = 0x04;
+	SYNCDELAY;
+	EP6FIFOCFG = 0x04;
+	SYNCDELAY;
+	EP8FIFOCFG = 0x04;
+	SYNCDELAY;
+
+	timer_init();
 
 	// we are just using the default values, yes this is not necessary...
 	EP1OUTCFG = 0xA0;
 	EP1INCFG = 0xA0;
 	SYNCDELAY;                    // see TRM section 15.14
-	EP2CFG = 0xA3;				// triple out
-	SYNCDELAY;                    
-	EP4CFG = 0x00;
-	SYNCDELAY;                    
-	EP6CFG = 0xE3;				// triple in
-	SYNCDELAY;                    
-	EP8CFG = 0xA0;				// double out
+	EP1OUTBC = 0;
 
+	REVCTL = 0x03; SYNCDELAY;		// see TRM 15.5.9
+
+	EP2CFG = 0xA2;	//(OUT, Size = 512, buf = Quad (Buf x2), BULK);
+	SYNCDELAY;                    
+
+	EP4CFG = 0xE2;	//(IN, Size = 512, buf = Quad (Buf x2), BULK)
+	SYNCDELAY;                    
+
+	EP6CFG = 0xE0;	//(IN, Size = 512, buf = Quad (Buf x4), BULK) 
+	SYNCDELAY;
+
+	EP8CFG = 0x00;
+	SYNCDELAY;                    
   
-	// since the defaults are double buffered we must write dummy byte counts twice
-	SYNCDELAY;                    
-	EP2BCL = 0x80;                // arm EP2OUT by writing byte count w/skip.
-	SYNCDELAY;                    
-	EP2BCL = 0x80;
-	SYNCDELAY;                    
-	EP2BCL = 0x80;
-	SYNCDELAY;                    
-	EP8BCL = 0x80;                // arm EP4OUT by writing byte count w/skip.
-	SYNCDELAY;                    
-	EP8BCL = 0x80;    
+	FIFOPINPOLAR = 0x00; SYNCDELAY;
+	EP4AUTOINLENH = 0x00; SYNCDELAY;
+	EP4AUTOINLENL = 0x20; SYNCDELAY;
+	EP6AUTOINLENH = 0x02; SYNCDELAY;
+	EP6AUTOINLENL = 0x00; SYNCDELAY;
 
-	// enable dual autopointer feature
-	AUTOPTRSETUP=0x07;
+	FIFORESET = 0x80; SYNCDELAY; // activate NAK-ALL to avoid race conditions
+	FIFORESET = 0x02; SYNCDELAY; // reset, FIFO 2
+	FIFORESET = 0x04; SYNCDELAY; // reset, FIFO 4
+	FIFORESET = 0x06; SYNCDELAY; // reset, FIFO 6
+	FIFORESET = 0x08; SYNCDELAY; // reset, FIFO 8
+	FIFORESET = 0x00; SYNCDELAY; // deactivate NAK-ALL
 
-	Rwuen = TRUE;                 // Enable remote-wakeup
+	// enable dual autopointer feature & inc
+	AUTOPTRSETUP = 0x07;
+
+	IOD = 0x00;	//MODE_IDLE
+	OED = 0xc0;	//MODE is output
+
+	PINFLAGSAB = 0xe8;	//FLAGA=ep2EF FLAGB=ep6FF
+	SYNCDELAY;                    
 
 #ifdef SDCC
 	{
@@ -92,325 +127,169 @@ void TD_Init(void)             // Called once at startup
 #endif
 }
 
-
-u8 wait=0,mode,flow;
-u16 frame_cnt,cmd_cnt=0,out_cnt;
-u8 xdata FlowStates[36];
-
-void flow_change(u8 i){
-	u8 *ptr;
-	i=3 & (GPIFWFSELECT >> i);
-	if(i!=flow){
-		ptr=FlowStates+i+(i<<3);
-		FLOWSTATE	= *(ptr++);
-		FLOWLOGIC	= *(ptr++);
-		FLOWEQ0CTL	= *(ptr++);
-		FLOWEQ1CTL	= *(ptr++);
-		FLOWHOLDOFF	= *(ptr++);
-		FLOWSTB		= *(ptr++);
-		FLOWSTBEDGE = *(ptr++);
-		FLOWSTBHPERIOD = *(ptr++);
-		flow=i;
-	}
-}
-
+// Called repeatedly while the device is idle
 void TD_Poll(void){
-	u8 i,j;
-	if(wait & 0x80){
-		if(!(GPIFTRIG & 0x80)) return;
-	}
-	else if(wait){
-		if((USBFRAMEL!=LSB(frame_cnt))||(USBFRAMEH!=MSB(frame_cnt))) return;
-	}
-	wait=0;
-	if(!(EP2468STAT & bmEP8EMPTY)){
-		if(cmd_cnt==0){
-			cmd_cnt=(EP8BCH<<8)+EP8BCL;
-			AUTOPTR1H=MSB( &EP8FIFOBUF );
-        	AUTOPTR1L=LSB( &EP8FIFOBUF );
-			AUTOPTRH2=MSB( &EP6FIFOBUF );
-        	AUTOPTRL2=LSB( &EP6FIFOBUF );
-			out_cnt=0;
-		}
-		for(;;){
-			switch(XAUTODAT1){
-			case CMD_MODE:
-				mode=XAUTODAT1;
-				j=(mode>>3)&1;
-				cmd_cnt--;
-
-				FIFORESET = 0x80;  // set NAKALL bit to NAK all transfers from host
-				SYNCDELAY;
-				FIFORESET = 0x02;  // reset EP2 FIFO
-				SYNCDELAY;
-				FIFORESET = 0x06;  // reset EP6 FIFO
-				SYNCDELAY;
-				FIFORESET = 0x00;  // clear NAKALL bit to resume normal operation
-				SYNCDELAY;
-
-				EP2FIFOCFG = 0x00|j; // allow core to see zero to one transition of auto out bit
-				SYNCDELAY;
-				EP2FIFOCFG = 0x10|j; // auto out mode, disable PKTEND zero length send, word ops
-				SYNCDELAY;
-				EP6FIFOCFG = 0x08|j; // auto in mode, disable PKTEND zero length send, word ops
-				SYNCDELAY;
-				EP4FIFOCFG = EP8FIFOCFG = j;	// for 8/16bit mode
-
-				//alternate init
-				PORTACFG = 0;
-				PORTCCFG = 0;
-				OEC = 0;
-				PORTECFG = 0;
-				OEE = 0;
-
-				if((mode&7)==0){		//PIO mode
-					IFCONFIG = 0xe0;	//clk-inter, 48MHz, clk-oe
-				}
-				else if((mode&7)==1){	//FIFO mode
-					FIFOPINPOLAR = 0x03;
-					PINFLAGSAB = 0xe8;		//FLAGB:EP6-FF FLAGA:EP2-EF
-					PINFLAGSCD = 0x0a;		//FLAGC:EP6-EF FLAGD:default
-					PORTACFG = 0x40;
-					IFCONFIG = 0xeb;	//(1110-1011) clk-inter, 48MHz, clk-oe, ASYNC, FIFO-slave
-				}
-				else{				//GPIF mode
-					if(mode & 0x10){	// use addr
-						PORTCCFG = 0xFF;    // [7:0] as alt. func. GPIFADR[7:0]
-						OEC = 0xFF;         // and as outputs
-						PORTECFG |= 0x80;   // [8] as alt. func. GPIFADR[8]
-						OEE |= 0x80;        // and as output
-						GPIFADRH = 0x00;    // bits[7:1] always 0
-						SYNCDELAY;
-						GPIFADRL = 0x00;    // point to PERIPHERAL address 0x0000
-					}
-					else{
-						PORTCCFG = 0;
-						OEC = 0;
-						PORTECFG = 0;
-						OEE = 0;
-					}
-					EP2GPIFFLGSEL = 0x01; // For EP2OUT, GPIF uses EF flag
-					SYNCDELAY;
-					EP6GPIFFLGSEL = 0x02; // For EP6IN, GPIF uses FF flag
-				}
+	u8 i, j;
+	u8 cmd_cnt,ret_cnt;
+	u8 addr_mask;
+	if (!(EP1OUTCS & bmEPBUSY)) {
+		cmd_cnt = EP1OUTBC;
+		AUTOPTR1H = MSB(&EP1OUTBUF);
+		AUTOPTR1L = LSB(&EP1OUTBUF);
+		AUTOPTRH2 = MSB(&EP1INBUF);
+		AUTOPTRL2 = LSB(&EP1INBUF);
+		ret_cnt = 0;
+		for (;;) {
+			if (cmd_cnt-- == 0)
 				break;
-			case CMD_GPIF:
-				GPIFABORT = 0xFF;  // abort any waveforms pending
-				i=XAUTODAT1;
-				if(mode & 0x40){	//GPIF STATE(PE0-2) DEBUG
-					i = i | 0x04;
-				}
-				else{
-					i = i & ~0x04;
-				}
-				IFCONFIG = i;
-
-				GPIFREADYCFG = XAUTODAT1;
-				GPIFCTLCFG = XAUTODAT1;
-				GPIFIDLECS = XAUTODAT1;
-				GPIFIDLECTL = XAUTODAT1;
-				i=XAUTODAT1;	//skip InitData[ 4 ]
-				GPIFWFSELECT = XAUTODAT1;
-				GPIFREADYSTAT = XAUTODAT1;
-				cmd_cnt-=(1+7);
-				break;
-			case CMD_WAVE:
-				//wave form
-				AUTOPTRH2 = 0xE4;
-				AUTOPTRL2 = 0x00;
- 				for(i=0;i<128;i++){
-					XAUTODAT2 = XAUTODAT1;
-				}
-				cmd_cnt-=(32*4);
-				break;
-			case CMD_WAVE0:
-				AUTOPTRL2 = 0x00;
-				goto WAVE_IN;
-			case CMD_WAVE1:
-				AUTOPTRL2 = 0x20;
-				goto WAVE_IN;
-			case CMD_WAVE2:
-				AUTOPTRL2 = 0x40;
-				goto WAVE_IN;
-			case CMD_WAVE3:
-				AUTOPTRL2 = 0x60;
-			WAVE_IN:
-				AUTOPTRH2 = 0xE4;
- 				for(i=0;i<32;i++){
-					XAUTODAT2 = XAUTODAT1;
-				}
-				cmd_cnt-=32;
-				break;
-			case CMD_FLOW:
-				//flow state
-				AUTOPTRH2=MSB( &FlowStates );
-    	    	AUTOPTRL2=LSB( &FlowStates );
-				for(i=0;i<4*9;i++){
-					XAUTODAT2 = XAUTODAT1;
-				}
-				AUTOPTRH2=MSB( &FlowStates );
-    	    	AUTOPTRL2=LSB( &FlowStates );
-				FLOWSTATE	= XAUTODAT2;
-				FLOWLOGIC	= XAUTODAT2;
-				FLOWEQ0CTL	= XAUTODAT2;
-				FLOWEQ1CTL	= XAUTODAT2;
-				FLOWHOLDOFF	= XAUTODAT2;
-				FLOWSTB		= XAUTODAT2;
-				FLOWSTBEDGE = XAUTODAT2;
-				FLOWSTBHPERIOD = XAUTODAT2;
-				flow=0;
-				cmd_cnt-=(9*4);
-				break;
-			case CMD_WFSEL:
-				for(;;) if(GPIFTRIG & 0x80) break;
-				GPIFWFSELECT = XAUTODAT1;
-				cmd_cnt--;
-				break;
-			case CMD_ADSET:
-				GPIFADRL = XAUTODAT1;
+			switch (XAUTODAT1) {
+			case CMD_EP4AUTOINLEN:
+				EP4FIFOCFG = 0x04;
 				SYNCDELAY;
-				GPIFADRH = XAUTODAT1;    // bits[7:1] always 0
+				REVCTL = 0x03; SYNCDELAY;		// see TRM 15.5.9
+				EP4CFG = 0xE2;	//(IN, Size = 512, buf = Quad (Buf x2), BULK)
+				SYNCDELAY;                    
+				FIFOPINPOLAR = 0x00; SYNCDELAY;
+				EP4AUTOINLENH = XAUTODAT1; SYNCDELAY;
+				EP4AUTOINLENL = XAUTODAT1; SYNCDELAY;
+				FIFORESET = 0x80; SYNCDELAY; // activate NAK-ALL to avoid race conditions
+				FIFORESET = 0x04; SYNCDELAY; // reset, FIFO 4
+				FIFORESET = 0x00; SYNCDELAY; // deactivate NAK-ALL
+				AUTOPTRSETUP = 0x07;
 				cmd_cnt-=2;
 				break;
-			case CMD_CPUCS:
-				CPUCS = XAUTODAT1;
-				cmd_cnt--;
-				break;
-			case CMD_USBCS:
-				XAUTODAT2=USBCS;
-				out_cnt++;
-				break;
-			case CMD_SWRITE:
-				for(;;) if(GPIFTRIG & 0x80) break;
-				if(mode & 0x20) flow_change(6);
-				if(mode & 0x08){
-					XGPIFSGLDATH = XAUTODAT1;
-					cmd_cnt--;
+
+			case CMD_IR_WBUF:
+				i = XAUTODAT1;
+				j = XAUTODAT1;
+				cmd_cnt -= 2+j;
+				for (;;) {
+					ir_wbuf[i++] = XAUTODAT1;
+					if (--j == 0) break;
 				}
-				XGPIFSGLDATLX = XAUTODAT1;		// trigger GPIF Single Word Write transaction
-				cmd_cnt--;
+				ir_wbuf_len = i;
+				ir_wbuf_idx = 0;
 				break;
-			case CMD_SREAD:
-				for(;;) if(GPIFTRIG & 0x80) break;
-				if(mode & 0x20) flow_change(4);
-				i=XGPIFSGLDATLX;					//dummy
-				for(;;) if(GPIFTRIG & 0x80) break;
-				if(mode & 0x08){
-					XAUTODAT2=XGPIFSGLDATH;
-					out_cnt++;
+
+			case CMD_IR_RBUF:
+				if (XAUTODAT1 == 0)
+					ir_rbuf_idx_cpy = ir_rbuf_idx;
+				cmd_cnt--;
+				for (i = 0; i < 64; i++) {
+					XAUTODAT2 = ir_rbuf[--ir_rbuf_idx_cpy];
+					ret_cnt++;
 				}
-				XAUTODAT2=XGPIFSGLDATLNOX;
-				out_cnt++;
 				break;
-			case CMD_BWRITE:
-				for(;;) if(GPIFTRIG & 0x80) break;
-				if(mode & 0x20) flow_change(2);
-				GPIFTCB0=XAUTODAT1;
-				SYNCDELAY;
-				GPIFTCB1=XAUTODAT1;
-				SYNCDELAY;
-				cmd_cnt-=2;
-				GPIFTRIG=GPIF_EP2;
+
+			case CMD_IR_CODE:
+				*((u8 *)&ir_code+1) = XAUTODAT1;
+				*((u8 *)&ir_code) = XAUTODAT1;
+				cmd_cnt -= 2;
 				break;
-			case CMD_BREAD:
-				for(;;) if(GPIFTRIG & 0x80) break;
-				if(mode & 0x20) flow_change(0);
-				GPIFTCB0=XAUTODAT1;
-				SYNCDELAY;
-				GPIFTCB1=XAUTODAT1;
-				SYNCDELAY;
-				cmd_cnt-=2;
-				GPIFTRIG = GPIFTRIGRD | GPIF_EP6; // launch GPIF FIFO READ Transaction to EP6 FIFO
+
+			case CMD_REG_WRITE:
+				IOD = MODE_REGW | (IOD & addr_mask) | XAUTODAT1;
+				IFCONFIG = 0xE0;	//48MHz IFCLK & PORTB enable
+				OEB = 0xff;			//PORTB all output
+				IOB = XAUTODAT1;
+				cmd_cnt -= 2;
 				break;
-			case CMD_OEA:
-				OEA=XAUTODAT1;
-				cmd_cnt--;
-				break;
-			case CMD_OEB:
-				OEB=XAUTODAT1;
-				cmd_cnt--;
-				break;
-			case CMD_OEC:
-				OEC=XAUTODAT1;
-				cmd_cnt--;
-				break;
-			case CMD_OED:
-				OED=XAUTODAT1;
-				cmd_cnt--;
-				break;
-			case CMD_OEE:
-				OEE=XAUTODAT1;
-				cmd_cnt--;
-				break;
-			case CMD_INA:
-				XAUTODAT2=IOA;
-				out_cnt++;
-				break;
-			case CMD_INB:
+
+			case CMD_REG_READ:
+				IOD = MODE_REGR | (IOD & addr_mask) | XAUTODAT1;
+				IFCONFIG = 0xE0;	//48MHz IFCLK & PORTB enable
+				OEB = 0x00;			//PORTB all input
 				XAUTODAT2=IOB;
-				out_cnt++;
+				ret_cnt++;
+				cmd_cnt -= 1;
 				break;
-			case CMD_INC:
-				XAUTODAT2=IOC;
-				out_cnt++;
+
+			case CMD_PORT_WRITE:
+				IOD = (IOD & ~addr_mask) | XAUTODAT1;
+				cmd_cnt -= 1;
 				break;
-			case CMD_IND:
-				XAUTODAT2=IOD;
-				out_cnt++;
+
+			case CMD_PORT_READ:
+				XAUTODAT2 = IOD;
+				ret_cnt++;
 				break;
-			case CMD_INE:
-				XAUTODAT2=IOE;
-				out_cnt++;
+
+			case CMD_PORT_CFG:
+				addr_mask = (XAUTODAT1 | 0xc0);
+				OED = XAUTODAT1 | addr_mask;
+				addr_mask = ~addr_mask;
+				cmd_cnt -= 2;
 				break;
-			case CMD_OUTA:
-				IOA=XAUTODAT1;
-				cmd_cnt--;
+
+			case CMD_IFCONFIG:
+				val_ifconfig = XAUTODAT1;
+				cmd_cnt -= 1;
 				break;
-			case CMD_OUTB:
-				IOB=XAUTODAT1;
-				cmd_cnt--;
+
+			case CMD_EP6IN_START:
+				IFCONFIG = val_ifconfig;
+
+				FIFORESET = 0x06;	// reset, FIFO 6
+				SYNCDELAY;
+
+				EP6FIFOCFG = 0x0C;	//8bit, Auto-IN
+				SYNCDELAY;
+
+				IOD = MODE_START | (IOD & 0x3f);
 				break;
-			case CMD_OUTC:
-				IOC=XAUTODAT1;
-				cmd_cnt--;
+
+			case CMD_EP6IN_STOP:
+				EP6FIFOCFG = 0x04;	//8bit
 				break;
-			case CMD_OUTD:
-				IOD=XAUTODAT1;
-				cmd_cnt--;
+
+			case CMD_EP4IN_START:
+				IFCONFIG = val_ifconfig;
+
+				FIFORESET = 0x04;	// reset, FIFO 4
+				SYNCDELAY;
+
+				EP4FIFOCFG = 0x0C;	//8bit, Auto-IN
+				SYNCDELAY;
+
+				IOD = MODE_START | (IOD & 0x3f);
 				break;
-			case CMD_OUTE:
-				IOE=XAUTODAT1;
-				cmd_cnt--;
+
+			case CMD_EP4IN_STOP:
+				EP4FIFOCFG = 0x04;	//8bit
 				break;
-			case CMD_WAIT:
-				frame_cnt=USBFRAMEL+(USBFRAMEH<<8)+XAUTODAT1+1;
-				cmd_cnt--;
-				wait=1;
+
+			case CMD_EP2OUT_START:
+				IFCONFIG = val_ifconfig;
+
+				FIFORESET = 0x02;	// reset, FIFO 2
+				SYNCDELAY;
+
+				OUTPKTEND = 0x82;
+				SYNCDELAY;
+				OUTPKTEND = 0x82;
+				SYNCDELAY;
+				OUTPKTEND = 0x82;
+				SYNCDELAY;
+				OUTPKTEND = 0x82;
+				SYNCDELAY;
+				EP2FIFOCFG = 0x10;	//8bit, Auto-OUT
+				SYNCDELAY;
+
+				IOD = MODE_START | (IOD & 0x3f);
 				break;
-			case CMD_NOP:
-				j=XAUTODAT1;
-				cmd_cnt--;
-				for(i=0;i<j;i++){
-					_nop_( );
-				}
+
+			case CMD_EP2OUT_STOP:
+				EP2FIFOCFG = 0x04;	//8bit
 				break;
-			default:
+
+			case CMD_MODE_IDLE:
+				IOD = MODE_IDLE | (IOD & 0x3f);
 				break;
 			}
-			cmd_cnt--;
-			if(cmd_cnt==0){
-				if(out_cnt){
-					EP6BCH=MSB(out_cnt);
-					SYNCDELAY;
-					EP6BCL=LSB(out_cnt);
-					SYNCDELAY;
-				}
-				EP8BCL=0x80;
-				break;
-			}
-			if(wait){
-				break;
-			}
+		}
+		EP1OUTBC = 0;			//arm EP1OUT
+		if (ret_cnt) {
+			EP1INBC = ret_cnt;
 		}
 	}
 }

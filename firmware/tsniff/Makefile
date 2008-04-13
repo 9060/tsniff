@@ -14,7 +14,7 @@ CC = sdcc
 HEX2BIX = objcopy -I ihex -O binary
 
 SRCS_C = \
-	fw.c main.c
+	fw.c main.c timer.c
 SRCS_ASM = \
 	dscr.asm USBJmpTb.asm
 

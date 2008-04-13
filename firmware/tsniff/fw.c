@@ -219,7 +219,7 @@ void main(void)
    // Renumerate if necessary.  Do this by checking the renum bit.  If it
    // is already set, there is no need to renumerate.  The renum bit will
    // already be set if this firmware was loaded from an eeprom.
-   if(!(USBCS & bmRENUM))
+   if(1/*!(USBCS & bmRENUM)*/)
    {
        EZUSB_Discon(TRUE);   // renumerate
    }
@@ -237,8 +237,11 @@ void main(void)
 
    // Task Dispatcher
    while(TRUE)               // Main Loop
-   while(TRUE)               // Main Loop
    {
+      // Poll User Device
+      TD_Poll();
+
+      // Check for pending SETUP
       if(GotSUD)            // Wait for SUDAV
       {
          SetupCommand();          // Implement setup command
@@ -268,7 +271,6 @@ void main(void)
              TD_Resume();
               }   
           }
-      TD_Poll();
    }
 }
 

@@ -1,3 +1,27 @@
+#define	MODE_IDLE	(0<<6)
+#define	MODE_REGR	(1<<6)
+#define	MODE_REGW	(2<<6)
+#define	MODE_START	(3<<6)
+
+#define CMD_EP6IN_START		0x50	//
+#define	CMD_EP6IN_STOP		0x51	//
+#define	CMD_EP2OUT_START	0x52	//
+#define	CMD_EP2OUT_STOP		0x53	//
+#define	CMD_PORT_CFG		0x54	//addr_mask, out_pins
+#define	CMD_REG_READ		0x55	//addr	(return 1byte)
+#define	CMD_REG_WRITE		0x56	//addr, value
+#define	CMD_PORT_READ		0x57	//(return 1byte)
+#define	CMD_PORT_WRITE		0x58	//value
+#define	CMD_IFCONFIG		0x59	//value
+#define	CMD_MODE_IDLE		0x5a
+#define CMD_EP4IN_START		0x5b	//
+#define	CMD_EP4IN_STOP		0x5c	//
+#define	CMD_IR_CODE			0x5d	//val_l, val_h (0x0000:non 0xffff:BUF output)
+#define CMD_IR_WBUF			0x5e	//ofs, len, data, ....
+#define	CMD_IR_RBUF			0x5f	//ofs (return 64byte)
+#define CMD_EP4AUTOINLEN	0x70	//EP4AUTOINLENH, EP4AUTOINLENL
+
+#if 0
 /*** FX2FW Ver1.01 by OPTIMIZE ***/
 #define TFIFO		0		//OUT2
 #define	CPIPE		1		//OUT8
@@ -52,4 +76,4 @@
 #define CMD_OUTE    0x0e    //output port
 #define CMD_WAIT    0x0f	//wait (byte0)ms
 #define CMD_NOP     0x10	//wait (byte0)cycles
-
+#endif

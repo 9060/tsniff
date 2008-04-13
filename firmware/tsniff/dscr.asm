@@ -44,7 +44,7 @@ DeviceDscr:
 	.db	64								;; Maximum packet size
 	.dw	0xB404							;; Vendor ID
 	.dw	0x0410							;; Product ID (Sample Device)
-	.dw	0x0100							;; Product version ID
+	.dw	0x0000							;; Product version ID
 	.db	1								;; Manufacturer string index
 	.db	2								;; Product string index
 	.db	0								;; Serial number string index
@@ -72,7 +72,7 @@ _HighSpeedConfigDscr:
 	.db	1														;; Number of interfaces
 	.db	1														;; Configuration number
 	.db	0														;; Configuration string
-	.db	0b10100000												;; Attributes (b7 - buspwr, b6 - selfpwr, b5 - rwu)
+	.db	0b10000000												;; Attributes (b7 - buspwr, b6 - selfpwr, b5 - rwu)
 	.db	50														;; Power requirement (div 2 ma)
 
 ;; Interface Descriptor
@@ -80,13 +80,31 @@ _HighSpeedConfigDscr:
 	.db	DSCR_INTRFC			;; Descriptor type
 	.db	0					;; Zero-based index of this interface
 	.db	0					;; Alternate setting
-	.db	3					;; Number of end points 
+	.db	5					;; Number of end points 
 	.db	0xff				;; Interface class
 	.db	0x00				;; Interface sub class
 	.db	0x00				;; Interface sub sub class
 	.db	0					;; Interface descriptor string index
       
-;; Endpoint Descriptor(O_2)
+;; Endpoint Descriptor
+	.db	DSCR_ENDPNT_LEN		;; Descriptor length
+	.db	DSCR_ENDPNT			;; Descriptor type
+	.db	0x01				;; Endpoint number, and direction
+	.db	ET_BULK				;; Endpoint type
+	.db	0x40				;; Maximun packet size (LSB)
+	.db	0x00				;; Max packect size (MSB)
+	.db	0x00				;; Polling interval
+
+;; Endpoint Descriptor
+	.db	DSCR_ENDPNT_LEN		;; Descriptor length
+	.db	DSCR_ENDPNT			;; Descriptor type
+	.db	0x81				;; Endpoint number, and direction
+	.db	ET_BULK				;; Endpoint type
+	.db	0x40				;; Maximun packet size (LSB)
+	.db	0x00				;; Max packect size (MSB)
+	.db	0x00				;; Polling interval
+
+;; Endpoint Descriptor
 	.db	DSCR_ENDPNT_LEN		;; Descriptor length
 	.db	DSCR_ENDPNT			;; Descriptor type
 	.db	0x02				;; Endpoint number, and direction
@@ -95,16 +113,16 @@ _HighSpeedConfigDscr:
 	.db	0x02				;; Max packect size (MSB)
 	.db	0x00				;; Polling interval
 
-;; Endpoint Descriptor(O_4)
+;; Endpoint Descriptor
 	.db	DSCR_ENDPNT_LEN		;; Descriptor length
 	.db	DSCR_ENDPNT			;; Descriptor type
-	.db	0x08				;; Endpoint number, and direction
+	.db	0x84				;; Endpoint number, and direction
 	.db	ET_BULK				;; Endpoint type
-	.db	0x00				;; Maximun packet size (LSB)
-	.db	0x02				;; Max packect size (MSB)
+	.db	0x20				;; Maximun packet size (LSB)
+	.db	0x00				;; Max packect size (MSB)
 	.db	0x00				;; Polling interval
 
-;; Endpoint Descriptor(I_6)
+;; Endpoint Descriptor
 	.db	DSCR_ENDPNT_LEN		;; Descriptor length
 	.db	DSCR_ENDPNT			;; Descriptor type
 	.db	0x86				;; Endpoint number, and direction
@@ -123,7 +141,7 @@ _FullSpeedConfigDscr:
 	.db	1														;; Number of interfaces
 	.db	1														;; Configuration number
 	.db	0														;; Configuration string
-	.db	0b10100000												;; Attributes (b7 - buspwr, b6 - selfpwr, b5 - rwu)
+	.db	0b10000000												;; Attributes (b7 - buspwr, b6 - selfpwr, b5 - rwu)
 	.db	50														;; Power requirement (div 2 ma)
 
 ;; Interface Descriptor
@@ -131,13 +149,31 @@ _FullSpeedConfigDscr:
 	.db	DSCR_INTRFC			;; Descriptor type
 	.db	0					;; Zero-based index of this interface
 	.db	0					;; Alternate setting
-	.db	3					;; Number of end points 
+	.db	5					;; Number of end points 
 	.db	0xff				;; Interface class
 	.db	0x00				;; Interface sub class
 	.db	0x00				;; Interface sub sub class
 	.db	0					;; Interface descriptor string index
 
-;; Endpoint Descriptor(O_2)
+;; Endpoint Descriptor
+	.db	DSCR_ENDPNT_LEN		;; Descriptor length
+	.db	DSCR_ENDPNT			;; Descriptor type
+	.db	0x01				;; Endpoint number, and direction
+	.db	ET_BULK				;; Endpoint type
+	.db	0x40				;; Maximun packet size (LSB)
+	.db	0x00				;; Max packect size (MSB)
+	.db	0x00				;; Polling interval
+
+;; Endpoint Descriptor
+	.db	DSCR_ENDPNT_LEN		;; Descriptor length
+	.db	DSCR_ENDPNT			;; Descriptor type
+	.db	0x81				;; Endpoint number, and direction
+	.db	ET_BULK				;; Endpoint type
+	.db	0x40				;; Maximun packet size (LSB)
+	.db	0x00				;; Max packect size (MSB)
+	.db	0x00				;; Polling interval
+
+;; Endpoint Descriptor
 	.db	DSCR_ENDPNT_LEN		;; Descriptor length
 	.db	DSCR_ENDPNT			;; Descriptor type
 	.db	0x02				;; Endpoint number, and direction
@@ -146,22 +182,22 @@ _FullSpeedConfigDscr:
 	.db	0x00				;; Max packect size (MSB)
 	.db	0x00				;; Polling interval
 
-;; Endpoint Descriptor(O_4)
+;; Endpoint Descriptor
 	.db	DSCR_ENDPNT_LEN		;; Descriptor length
 	.db	DSCR_ENDPNT			;; Descriptor type
-	.db	0x08				;; Endpoint number, and direction
+	.db	0x84				;; Endpoint number, and direction
 	.db	ET_BULK				;; Endpoint type
-	.db	0x40				;; Maximun packet size (LSB)
+	.db	0x20				;; Maximun packet size (LSB)
 	.db	0x00				;; Max packect size (MSB)
 	.db	0x00				;; Polling interval
 
-;; Endpoint Descriptor(I_6)
+;; Endpoint Descriptor
 	.db	DSCR_ENDPNT_LEN		;; Descriptor length
 	.db	DSCR_ENDPNT			;; Descriptor type
 	.db	0x86				;; Endpoint number, and direction
 	.db	ET_BULK				;; Endpoint type
-	.db	0x40				;; Maximun packet size (LSB)
-	.db	0x00				;; Max packect size (MSB)
+	.db	0x00				;; Maximun packet size (LSB)
+	.db	0x02				;; Max packect size (MSB)
 	.db	0x00				;; Polling interval
 
 FullSpeedConfigDscrEnd:
@@ -171,32 +207,58 @@ StringDscr:
 StringDscr0:
 	.db	StringDscr0End-StringDscr0		;; String descriptor length
 	.db	DSCR_STRING
-	.db	0x04,0x04
+	.db	0x09,0x04
 StringDscr0End:
 
 StringDscr1:	
 	.db	StringDscr1End-StringDscr1		;; String descriptor length
 	.db	DSCR_STRING
-	.ascii 'F'
+	.ascii 'T'
 	.db 0x00
+	.ascii 'S'
+	.db	0x00
+	.ascii 'N'
+	.db	0x00
+	.ascii 'I'
+	.db	0x00
+	.ascii 'F'
+	.db	0x00
+	.ascii 'F'
+	.db	0x00
+	.ascii '_'
+	.db	0x00
 	.ascii '2'
 	.db	0x00
-	.ascii 'F'
+	.ascii '0'
 	.db	0x00
-	.ascii 'W'
+	.ascii '0'
+	.db	0x00
+	.ascii '8'
+	.db	0x00
+	.ascii '0'
+	.db	0x00
+	.ascii '4'
+	.db	0x00
+	.ascii '1'
+	.db	0x00
+	.ascii '4'
 	.db	0x00
 StringDscr1End:
 
 StringDscr2:	
 	.db	StringDscr2End-StringDscr2		;; Descriptor length
 	.db	DSCR_STRING
-	.ascii 'V'
+	.ascii 'E'
 	.db	0x00
-	.ascii '1'
+	.ascii 'Z'
 	.db	0x00
-	.ascii '0'
+	.ascii '-'
 	.db	0x00
-	.ascii '0'
+	.ascii 'U'
+	.db	0x00
+	.ascii 'S'
+	.db	0x00
+	.ascii 'B'
 	.db	0x00
 StringDscr2End:
 
