@@ -14,9 +14,8 @@ def configure(conf):
     conf.check_pkg('libusb-1.0', destvar='LIBUSB', mandatory=True)
 
     conf.sub_config('extra/b25')
+#     conf.sub_config('lib/firmware/lib')
 
 def build(bld):
     bld.add_subdirs('extra/b25 lib tsniff')
-#     obj = bld.create_obj('cpp', 'program')
-#     obj.source = ''
-#     obj.target = 'tsniff'
+#     bld.add_subdirs('extra/b25 lib lib/firmware/lib tsniff')
