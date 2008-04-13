@@ -7,7 +7,7 @@
 // Copyright 2003, Cypress Semiconductor Corporation
 //-----------------------------------------------------------------------------
 #ifndef SDCC
-  #pragma noiv               // Do not generate interrupt vectors
+#pragma noiv               // Do not generate interrupt vectors
 #endif
 
 #include "fx2.h"
@@ -45,96 +45,50 @@ BOOL enum_high_speed = FALSE;       // flag to let firmware know FX2 enumerated 
 //   The following hooks are called by the task dispatcher.
 //-----------------------------------------------------------------------------
 
-/*
-void tty_out(s8 *s){
-	u8 i=0;
-	while(s[i]){
-		if(s[i]=='\n'){
-			SBUF0=0x0d;
-		}
-		else{
-			SBUF0=s[i];
-		}
-		i++;
-		for(;;){
-			if(TI==1) break;
-		}
-		TI=0;
-	}
-}
-
-const s8 hexchar[16]={
-'0','1','2','3','4','5','6','7',
-'8','9','A','B','C','D','E','F'
-};
-
-void tty_hex(u8 u){
-	u8 s[3];
-	s[0]=hexchar[u>>4];
-	s[1]=hexchar[u & 0x0f];
-	s[2]=0;
-	tty_out(s);
-}
-*/
-
-
 void TD_Init(void)             // Called once at startup
 { 
-//	unsigned char i;
+	//	unsigned char i;
 
-  // set the CPU clock to 48MHz
-  CPUCS = ((CPUCS & ~bmCLKSPD) | bmCLKSPD1);
-  SYNCDELAY; 
+	// set the CPU clock to 48MHz
+	CPUCS = ((CPUCS & ~bmCLKSPD) | bmCLKSPD1);
+	SYNCDELAY; 
 
-/*
-	//serial port init
-	UART230=0x01;	//port0 set 230/115K baud
-	SCON0    = 0x50; // 0101 0000 mode=1, REN_1=1
-	TI       = 0;
-	for(i=0;i<100;i++){
-		SBUF0=i+0x20;
-		for(;;){
-			if(TI==1) break;
-		}
-		TI=0;
-	}
-*/
-  // we are just using the default values, yes this is not necessary...
-  EP1OUTCFG = 0xA0;
-  EP1INCFG = 0xA0;
-  SYNCDELAY;                    // see TRM section 15.14
-  EP2CFG = 0xA3;				// triple out
-  SYNCDELAY;                    
-  EP4CFG = 0x00;
-  SYNCDELAY;                    
-  EP6CFG = 0xE3;				// triple in
-  SYNCDELAY;                    
-  EP8CFG = 0xA0;				// double out
+	// we are just using the default values, yes this is not necessary...
+	EP1OUTCFG = 0xA0;
+	EP1INCFG = 0xA0;
+	SYNCDELAY;                    // see TRM section 15.14
+	EP2CFG = 0xA3;				// triple out
+	SYNCDELAY;                    
+	EP4CFG = 0x00;
+	SYNCDELAY;                    
+	EP6CFG = 0xE3;				// triple in
+	SYNCDELAY;                    
+	EP8CFG = 0xA0;				// double out
 
   
-  // since the defaults are double buffered we must write dummy byte counts twice
-  SYNCDELAY;                    
-  EP2BCL = 0x80;                // arm EP2OUT by writing byte count w/skip.
-  SYNCDELAY;                    
-  EP2BCL = 0x80;
-  SYNCDELAY;                    
-  EP2BCL = 0x80;
-  SYNCDELAY;                    
-  EP8BCL = 0x80;                // arm EP4OUT by writing byte count w/skip.
-  SYNCDELAY;                    
-  EP8BCL = 0x80;    
+	// since the defaults are double buffered we must write dummy byte counts twice
+	SYNCDELAY;                    
+	EP2BCL = 0x80;                // arm EP2OUT by writing byte count w/skip.
+	SYNCDELAY;                    
+	EP2BCL = 0x80;
+	SYNCDELAY;                    
+	EP2BCL = 0x80;
+	SYNCDELAY;                    
+	EP8BCL = 0x80;                // arm EP4OUT by writing byte count w/skip.
+	SYNCDELAY;                    
+	EP8BCL = 0x80;    
 
-  // enable dual autopointer feature
-  AUTOPTRSETUP=0x07;
+	// enable dual autopointer feature
+	AUTOPTRSETUP=0x07;
 
-  Rwuen = TRUE;                 // Enable remote-wakeup
+	Rwuen = TRUE;                 // Enable remote-wakeup
 
 #ifdef SDCC
-  {
-    // wait
-    WORD i;
-    for(i = 0; i < 30000; i++);
-  }
+	{
+		// wait
+		WORD i;
+		for(i = 0; i < 30000; i++);
+	}
 #endif
 }
 
@@ -280,7 +234,7 @@ void TD_Poll(void){
 				goto WAVE_IN;
 			case CMD_WAVE3:
 				AUTOPTRL2 = 0x60;
-WAVE_IN:
+			WAVE_IN:
 				AUTOPTRH2 = 0xE4;
  				for(i=0;i<32;i++){
 					XAUTODAT2 = XAUTODAT1;
@@ -462,17 +416,17 @@ WAVE_IN:
 }
 
 #ifdef SDCC
-  #define BOOL BYTE
+#define BOOL BYTE
 #endif
 
 BOOL TD_Suspend(void)          // Called before the device goes into suspend mode
 {
-   return(TRUE);
+	return(TRUE);
 }
 
 BOOL TD_Resume(void)          // Called after the device resumes
 {
-   return(TRUE);
+	return(TRUE);
 }
 
 //-----------------------------------------------------------------------------
@@ -482,75 +436,75 @@ BOOL TD_Resume(void)          // Called after the device resumes
 
 BOOL DR_GetDescriptor(void)
 {
-   return(TRUE);
+	return(TRUE);
 }
 
 BOOL DR_SetConfiguration(void)   // Called when a Set Configuration command is received
 {
-   Configuration = SETUPDAT[2];
-   return(TRUE);            // Handled by user code
+	Configuration = SETUPDAT[2];
+	return(TRUE);            // Handled by user code
 }
 
 BOOL DR_GetConfiguration(void)   // Called when a Get Configuration command is received
 {
-   EP0BUF[0] = Configuration;
-   EP0BCH = 0;
-   EP0BCL = 1;
-   return(TRUE);            // Handled by user code
+	EP0BUF[0] = Configuration;
+	EP0BCH = 0;
+	EP0BCL = 1;
+	return(TRUE);            // Handled by user code
 }
 
 BOOL DR_SetInterface(void)       // Called when a Set Interface command is received
 {
-   AlternateSetting = SETUPDAT[2];
-   return(TRUE);            // Handled by user code
+	AlternateSetting = SETUPDAT[2];
+	return(TRUE);            // Handled by user code
 }
 
 BOOL DR_GetInterface(void)       // Called when a Set Interface command is received
 {
-   EP0BUF[0] = AlternateSetting;
-   EP0BCH = 0;
-   EP0BCL = 1;
-   return(TRUE);            // Handled by user code
+	EP0BUF[0] = AlternateSetting;
+	EP0BCH = 0;
+	EP0BCL = 1;
+	return(TRUE);            // Handled by user code
 }
 
 BOOL DR_GetStatus(void)
 {
-   return(TRUE);
+	return(TRUE);
 }
 
 BOOL DR_ClearFeature(void)
 {
-   return(TRUE);
+	return(TRUE);
 }
 
 BOOL DR_SetFeature(void)
 {
-   return(TRUE);
+	return(TRUE);
 }
 
 BOOL DR_VendorCmnd(void)
 {
-  BYTE tmp;
+	BYTE tmp;
   
-  switch (SETUPDAT[1])
-  {
-     case VR_NAKALL_ON:
-        tmp = FIFORESET;
-        tmp |= bmNAKALL;      
-        SYNCDELAY;                    
-        FIFORESET = tmp;
-        break;
-     case VR_NAKALL_OFF:
-        tmp = FIFORESET;
-        tmp &= ~bmNAKALL;      
-        SYNCDELAY;                    
-        FIFORESET = tmp;
-        break;
-     default:
-        return(TRUE);
-  }
+	switch (SETUPDAT[1])
+		{
+		case VR_NAKALL_ON:
+			tmp = FIFORESET;
+			tmp |= bmNAKALL;      
+			SYNCDELAY;                    
+			FIFORESET = tmp;
+			break;
+		case VR_NAKALL_OFF:
+			tmp = FIFORESET;
+			tmp &= ~bmNAKALL;      
+			SYNCDELAY;                    
+			FIFORESET = tmp;
+			break;
+		default:
+			return(TRUE);
+		}
 
-  return(FALSE);
+	return(FALSE);
 }
 
 //-----------------------------------------------------------------------------
@@ -561,375 +515,375 @@ BOOL DR_VendorCmnd(void)
 // Setup Data Available Interrupt Handler
 void ISR_Sudav(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 13
+	interrupt 13
 #endif
 {
-   GotSUD = TRUE;            // Set flag
-   EZUSB_IRQ_CLEAR();
-   USBIRQ = bmSUDAV;         // Clear SUDAV IRQ
+	GotSUD = TRUE;            // Set flag
+	EZUSB_IRQ_CLEAR();
+	USBIRQ = bmSUDAV;         // Clear SUDAV IRQ
 }
 
 void ISR_Sof(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 14
+	interrupt 14
 #endif
 {
-   EZUSB_IRQ_CLEAR();
-   USBIRQ = bmSOF;            // Clear SOF IRQ
+	EZUSB_IRQ_CLEAR();
+	USBIRQ = bmSOF;            // Clear SOF IRQ
 }
 
 // Setup Token Interrupt Handler
 void ISR_Sutok(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 15
+	interrupt 15
 #endif
 {
-   EZUSB_IRQ_CLEAR();
-   USBIRQ = bmSUTOK;         // Clear SUTOK IRQ
+	EZUSB_IRQ_CLEAR();
+	USBIRQ = bmSUTOK;         // Clear SUTOK IRQ
 }
 
 void ISR_Susp(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 16
+	interrupt 16
 #endif
 {
-   Sleep = TRUE;
-   EZUSB_IRQ_CLEAR();
-   USBIRQ = bmSUSP;
+	Sleep = TRUE;
+	EZUSB_IRQ_CLEAR();
+	USBIRQ = bmSUSP;
 }
 
 void ISR_Ures(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 17
+	interrupt 17
 #endif
 {
-   // whenever we get a USB reset, we should revert to full speed mode
-   pConfigDscr = pFullSpeedConfigDscr;
-   ((CONFIGDSCR xdata *) pConfigDscr)->type = CONFIG_DSCR;
-   pOtherConfigDscr = pHighSpeedConfigDscr;
-   ((CONFIGDSCR xdata *) pOtherConfigDscr)->type = OTHERSPEED_DSCR;
+	// whenever we get a USB reset, we should revert to full speed mode
+	pConfigDscr = pFullSpeedConfigDscr;
+	((CONFIGDSCR xdata *) pConfigDscr)->type = CONFIG_DSCR;
+	pOtherConfigDscr = pHighSpeedConfigDscr;
+	((CONFIGDSCR xdata *) pOtherConfigDscr)->type = OTHERSPEED_DSCR;
 
-   EZUSB_IRQ_CLEAR();
-   USBIRQ = bmURES;         // Clear URES IRQ
+	EZUSB_IRQ_CLEAR();
+	USBIRQ = bmURES;         // Clear URES IRQ
 }
 
 void ISR_Highspeed(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 18
+	interrupt 18
 #endif
 {
-   if (EZUSB_HIGHSPEED())
-   {
-      pConfigDscr = pHighSpeedConfigDscr;
-      ((CONFIGDSCR xdata *) pConfigDscr)->type = CONFIG_DSCR;
-      pOtherConfigDscr = pFullSpeedConfigDscr;
-      ((CONFIGDSCR xdata *) pOtherConfigDscr)->type = OTHERSPEED_DSCR;
-   }
+	if (EZUSB_HIGHSPEED())
+		{
+			pConfigDscr = pHighSpeedConfigDscr;
+			((CONFIGDSCR xdata *) pConfigDscr)->type = CONFIG_DSCR;
+			pOtherConfigDscr = pFullSpeedConfigDscr;
+			((CONFIGDSCR xdata *) pOtherConfigDscr)->type = OTHERSPEED_DSCR;
+		}
 
-   EZUSB_IRQ_CLEAR();
-   USBIRQ = bmHSGRANT;
+	EZUSB_IRQ_CLEAR();
+	USBIRQ = bmHSGRANT;
 }
 
 void ISR_Ep0ack(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 19
+	interrupt 19
 #endif
 {
 }
 
 void ISR_Stub(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 20
+	interrupt 20
 #endif
 {
 }
 void ISR_Ep0in(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 21
+	interrupt 21
 #endif
 {
 }
 void ISR_Ep0out(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 22
+	interrupt 22
 #endif
 {
 }
 void ISR_Ep1in(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 23
+	interrupt 23
 #endif
 {
 }
 void ISR_Ep1out(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 24
+	interrupt 24
 #endif
 {
 }
 void ISR_Ep2inout(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 25
+	interrupt 25
 #endif
 {
 }
 void ISR_Ep4inout(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 26
+	interrupt 26
 #endif
 {
 }
 void ISR_Ep6inout(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 27
+	interrupt 27
 #endif
 {
 }
 void ISR_Ep8inout(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 28
+	interrupt 28
 #endif
 {
 }
 void ISR_Ibn(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 29
+	interrupt 29
 #endif
 {
 }
 void ISR_Ep0pingnak(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 30
+	interrupt 30
 #endif
 {
 }
 void ISR_Ep1pingnak(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 31
+	interrupt 31
 #endif
 {
 }
 void ISR_Ep2pingnak(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 32
+	interrupt 32
 #endif
 {
 }
 void ISR_Ep4pingnak(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 33
+	interrupt 33
 #endif
 {
 }
 void ISR_Ep6pingnak(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 34
+	interrupt 34
 #endif
 {
 }
 void ISR_Ep8pingnak(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 35
+	interrupt 35
 #endif
 {
 }
 
 void ISR_Errorlimit(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 36
+	interrupt 36
 #endif
 {
 }
 void ISR_Ep2piderror(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 37
+	interrupt 37
 #endif
 {
 }
 void ISR_Ep4piderror(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 38
+	interrupt 38
 #endif
 {
 }
 void ISR_Ep6piderror(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 39
+	interrupt 39
 #endif
 {
 }
 void ISR_Ep8piderror(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 40
+	interrupt 40
 #endif
 {
 }
 
 void ISR_Ep2pflag(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 41
+	interrupt 41
 #endif
 {
 }
 void ISR_Ep4pflag(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 42
+	interrupt 42
 #endif
 {
 }
 void ISR_Ep6pflag(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 43
+	interrupt 43
 #endif
 {
 }
 void ISR_Ep8pflag(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 44
+	interrupt 44
 #endif
 {
 }
 void ISR_Ep2eflag(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 45
+	interrupt 45
 #endif
 {
 }
 void ISR_Ep4eflag(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 46
+	interrupt 46
 #endif
 {
 }
 void ISR_Ep6eflag(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 47
+	interrupt 47
 #endif
 {
 }
 void ISR_Ep8eflag(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 48
+	interrupt 48
 #endif
 {
 }
 void ISR_Ep2fflag(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 49
+	interrupt 49
 #endif
 {
 }
 void ISR_Ep4fflag(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 50
+	interrupt 50
 #endif
 {
 }
 void ISR_Ep6fflag(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 51
+	interrupt 51
 #endif
 {
 }
 void ISR_Ep8fflag(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 52
+	interrupt 52
 #endif
 {
 }
 void ISR_GpifComplete(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 53
+	interrupt 53
 #endif
 {
 }
 void ISR_GpifWaveform(void)
 #ifndef SDCC
-  interrupt 0
+	interrupt 0
 #else
-  interrupt 54
+	interrupt 54
 #endif
 {
 }
