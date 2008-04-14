@@ -133,14 +133,6 @@ CUSBFX2
 --fx2-ts-buffer-count=N
     TS 転送の同時リクエスト数を N に変更します。デフォルトは 16 です。
 
---fx2-bcas-packet-size=N
-    B-CAS データのパケットサイズを N バイトに変更します。
-    1 〜 512 バイトが指定可能です。
-    デフォルトは 32 です。
-
-    これは実験的なオプションです。現時点では面倒な制限があるため利用しないでください。
-    将来的にはよりスマートな解決策を用意する予定です。
-
 
 ARIB STD-B25
 ------------
@@ -153,7 +145,7 @@ ARIB STD-B25
 
 --b25-ts-delay
     入力ソースが CUSBFX2 であるとき、TS 入力の遅延時間を N 秒に変更します。
-    デフォルトは 3 秒です。
+    デフォルトは 0.5 秒です。
 
 --b25-bcas-queue-size
     B-CAS データ入力が CUSBFX2 であるとき、履歴として保持する鍵の数を N に変更します。
@@ -285,6 +277,7 @@ tsniff は shell script や MythTV などのフロントエンドに対して、
 ハードウェア制御などの処理を行うバックエンドとして利用することを想定しています。
 よって、 tsniff そのものに予約などの高度な機能を追加する予定は **全くありません** 。
 
+
 B-CAS 初期データ
 ----------------
 
@@ -317,6 +310,15 @@ tsniff.conf::
 * arib_std_b25-atty: 1d4752d3156f
 
 
+RESOURCES
+=========
+
+* http://d.hatena.ne.jp/atty/
+* http://atty.skr.jp/hg/tsniff/
+* http://atty.skr.jp/hg/arib_std_b25-atty/
+* http://atty.skr.jp/hg/cap_sts-atty/
+
+
 AUTHORS
 =======
 
@@ -330,7 +332,5 @@ TODO
 * ポータビリティの向上(\*BSD, MacOSX, ... Windows はしらね) 
 * VLC の input module にする
 * mplayer の input module にする
-* EP4INのパケットサイズを可変にする(ファームウェアのパッチ当て)
-  変更後は、EP4INのパケットサイズをディスクリプタから読んで設定する
 * Friio対応(実機がない)
 * TSの処理

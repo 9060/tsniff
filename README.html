@@ -305,37 +305,46 @@ ul.auto-toc {
 </div>
 <div class="section">
 <h1><a id="install" name="install">INSTALL</a></h1>
+<blockquote>
+python 2.3
+libusb 1.0
+libpcsclite
+glib 2.0
+sdcc</blockquote>
 <ol class="arabic">
+<li><p class="first">tsniff を入手します:</p>
+<pre class="literal-block">
+$ hg clone http://atty.skr.jp/hg/tsniff
+</pre>
+</li>
 <li><p class="first">依存ライブラリをインストールします:</p>
 <pre class="literal-block">
 $ sudo aptitude install libglib2.0-dev libpcsclite-dev
 </pre>
 </li>
-<li><p class="first">tsniff 入手し、bootstrap を実行します:</p>
+<li><p class="first">libusb-1.0 を入手し、パッチを当て、インストールします:</p>
 <pre class="literal-block">
-$ hg clone http://atty.skr.jp/hg/tsniff
-$ cd tsniff
+$ git clone git://projects.reactivated.net/~dsd/libusb.git libusb-1.0
+$ cd libusb-1.0
+$ patch -p1 &lt;../tsniff/extra/libusb.patch
+$ ./autogen.sh
+$ ./configure
+$ make
+$ sudo make install
+$ cd ..
 </pre>
 </li>
-<li><p class="first">libusb-1.0 を入手し、bootstrap を実行します:</p>
+<li><p class="first">arib_std_b25-atty を入手し、tsniff のソースツリーに配置します:</p>
 <pre class="literal-block">
-$ git clone git://projects.reactivated.net/~dsd/libusb.git extra/libusb
-$ ( cd extra/libusb &amp;&amp; patch -p1 &lt;../libusb.patch &amp;&amp; ./autogen.sh )
-</pre>
-</li>
-<li><p class="first">arib_std_b25-atty を入手し、bootstrap を実行します:</p>
-<pre class="literal-block">
-$ hg clone http://atty.skr.jp/hg/arib_std_b25-atty extra/b25
-$ ( cd extra/b25 &amp;&amp; ./autogen.sh )
+$ hg clone http://atty.skr.jp/hg/arib_std_b25-atty tsniff/extra/arib_std_b25
 </pre>
 </li>
 <li><p class="first">tsniff をビルド・インストールします:</p>
 <pre class="literal-block">
-$ ./autogen.sh
-$ mkdir build; cd build
-$ ../configure
-$ make
-$ sudo make install
+$ cd tsniff
+$ ./waf configure
+$ ./waf
+$ sudo ./waf install
 </pre>
 </li>
 </ol>
@@ -449,15 +458,6 @@ $ sudo make install
 <kbd><span class="option">--fx2-ts-buffer-count=<var>N</var></span></kbd></td>
 </tr>
 <tr><td>&nbsp;</td><td>TS 転送の同時リクエスト数を N に変更します。デフォルトは 16 です。</td></tr>
-<tr><td class="option-group" colspan="2">
-<kbd><span class="option">--fx2-bcas-packet-size=<var>N</var></span></kbd></td>
-</tr>
-<tr><td>&nbsp;</td><td><p class="first">B-CAS データのパケットサイズを N バイトに変更します。
-1 〜 512 バイトが指定可能です。
-デフォルトは 32 です。</p>
-<p class="last">これは実験的なオプションです。現時点では面倒な制限があるため利用しないでください。
-将来的にはよりスマートな解決策を用意する予定です。</p>
-</td></tr>
 </tbody>
 </table>
 </div>
@@ -477,7 +477,7 @@ $ sudo make install
 <tr><td class="option-group">
 <kbd><span class="option">--b25-ts-delay</span></kbd></td>
 <td>入力ソースが CUSBFX2 であるとき、TS 入力の遅延時間を N 秒に変更します。
-デフォルトは 3 秒です。</td></tr>
+デフォルトは 0.5 秒です。</td></tr>
 <tr><td class="option-group" colspan="2">
 <kbd><span class="option">--b25-bcas-queue-size</span></kbd></td>
 </tr>
@@ -648,14 +648,25 @@ $ tsniff --dump-bcas-init-status &gt;$HOME/.config/tsniff.conf
 </div>
 </div>
 <div class="section">
+<h1><a id="resources" name="resources">RESOURCES</a></h1>
+<ul class="simple">
+<li><a class="reference" href="http://d.hatena.ne.jp/atty/">http://d.hatena.ne.jp/atty/</a></li>
+<li><a class="reference" href="http://atty.skr.jp/hg/tsniff/">http://atty.skr.jp/hg/tsniff/</a></li>
+<li><a class="reference" href="http://atty.skr.jp/hg/arib_std_b25-atty/">http://atty.skr.jp/hg/arib_std_b25-atty/</a></li>
+<li><a class="reference" href="http://atty.skr.jp/hg/cap_sts-atty/">http://atty.skr.jp/hg/cap_sts-atty/</a></li>
+</ul>
+</div>
+<div class="section">
+<h1><a id="authors" name="authors">AUTHORS</a></h1>
+<p>Koji Agawa &lt;<a class="reference" href="mailto:atty303&#64;gmail.com">atty303&#64;gmail.com</a>&gt;</p>
+</div>
+<div class="section">
 <h1><a id="todo" name="todo">TODO</a></h1>
 <ul class="simple">
 <li>終了ステータス (エラーの有無)</li>
 <li>ポータビリティの向上(*BSD, MacOSX, ... Windows はしらね)</li>
 <li>VLC の input module にする</li>
 <li>mplayer の input module にする</li>
-<li>EP4INのパケットサイズを可変にする(ファームウェアのパッチ当て)
-変更後は、EP4INのパケットサイズをディスクリプタから読んで設定する</li>
 <li>Friio対応(実機がない)</li>
 <li>TSの処理</li>
 </ul>
