@@ -56,7 +56,8 @@ static GOptionEntry st_ir_options[] = {
 static gboolean st_b25_is_enabled = FALSE;
 static gint st_b25_round = 4;
 static gboolean st_b25_strip = FALSE;
-static gint st_b25_ts_delay = 3;
+static gdouble st_b25_ts_delay = 0.5;
+static gint st_b25_ts_delay_string = NULL;
 static gint st_b25_bcas_queue_size = 256;
 static gchar *st_b25_system_key = NULL;
 static gchar *st_b25_init_cbc = NULL;
@@ -65,8 +66,8 @@ static GOptionEntry st_b25_options[] = {
 	  "Set MULTI-2 round factor to N [4]", "N" },
 	{ "b25-strip", 'S', 0, G_OPTION_ARG_NONE, &st_b25_strip,
 	  "Discard NULL packets from output [disabled]", NULL },
-	{ "b25-ts-delay", 0, 0, G_OPTION_ARG_INT, &st_b25_ts_delay,
-	  "Delay TS input by N seconds, if --bcas-input="INPUT_TYPE_FX2_PREFIX" [3]", "N" },
+	{ "b25-ts-delay", 0, 0, G_OPTION_ARG_STRING, &st_b25_ts_delay_string,
+	  "Delay TS input by N seconds, if --bcas-input="INPUT_TYPE_FX2_PREFIX" [0.5]", "N" },
 	{ "b25-bcas-queue-size", 0, 0, G_OPTION_ARG_INT, &st_b25_bcas_queue_size,
 	  "Set ECM buffer capacity of pseudo B-CAS reader to N [256]", "N" },
 	{ "b25-system-key", 0, 0, G_OPTION_ARG_STRING, &st_b25_system_key,
@@ -866,6 +867,10 @@ parse_options(int *argc, char ***argv)
 
 	st_ir_base = CLAMP(st_ir_base, 1, 3);
 	st_ir_source = CLAMP(st_ir_source, -1, 2);
+
+	if (st_b25_ts_delay_string) {
+		st_b25_ts_delay = g_ascii_strtod(st_b25_ts_delay_string, NULL);
+	}
 
 	if (g_str_has_prefix(st_ts_input, INPUT_TYPE_FX2_PREFIX))
 		st_ts_input_type = INPUT_TYPE_FX2;
