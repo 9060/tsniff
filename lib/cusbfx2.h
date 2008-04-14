@@ -27,8 +27,8 @@ gint
 cusbfx2_bulk_transfer(cusbfx2_handle *h, guint8 endpoint, guint8 *data, gint length);
 
 cusbfx2_transfer *
-cusbfx2_init_bulk_transfer(cusbfx2_handle *h, const gchar *name, guint8 endpoint,
-						   gint length, gint nqueues,
+cusbfx2_init_bulk_transfer(cusbfx2_handle *h, const gchar *name, gboolean is_interrupt,
+						   guint8 endpoint, gint length, gint nqueues,
 						   cusbfx2_transfer_cb_fn callback, gpointer user_data);
 
 void

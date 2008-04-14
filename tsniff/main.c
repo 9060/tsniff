@@ -491,7 +491,7 @@ run(void)
 
 		if (st_ts_input_type == INPUT_TYPE_FX2) {
 			g_message("*** setup TS transfer");
-			transfer_ts = cusbfx2_init_bulk_transfer(device, "TS", ENDPOINT_TS_IN,
+			transfer_ts = cusbfx2_init_bulk_transfer(device, "TS", FALSE, ENDPOINT_TS_IN,
 													 st_fx2_ts_buffer_size, st_fx2_ts_buffer_count,
 													 transfer_ts_cb, NULL);
 			if (!transfer_ts) {
@@ -503,7 +503,7 @@ run(void)
 
 		if (st_bcas_input_type == INPUT_TYPE_FX2) {
 			g_message("*** setup B-CAS transfer");
-			transfer_bcas = cusbfx2_init_bulk_transfer(device, "B-CAS", ENDPOINT_BCAS_IN,
+			transfer_bcas = cusbfx2_init_bulk_transfer(device, "B-CAS", TRUE, ENDPOINT_BCAS_IN,
 													   512, 1, transfer_bcas_cb, NULL);
 			if (!transfer_bcas) {
 				g_critical("!!! couldn't setup B-CAS transfer");

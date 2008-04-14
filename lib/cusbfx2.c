@@ -346,14 +346,16 @@ cusbfx2_transfer_callback(struct libusb_transfer *usb_transfer)
 
 
 /**
- * Setup asynchronus bulk transfer.
+ * Setup asynchronus bulk or intterupt transfer.
  *
- * @param size 転送サイズ
- * @param nqueues キュー数
+ * @param[in]	name	Transfer identifier
+ * @param[in]	is_interrupt	Setup intterupt transfer when TRUE, elsewhere setup bulk transfer.
+ * @param[in]	length	転送サイズ
+ * @param[in]	nqueues	キュー数
  */
 cusbfx2_transfer *
-cusbfx2_init_bulk_transfer(cusbfx2_handle *h, const gchar *name, guint8 endpoint,
-						   gint length, gint nqueues,
+cusbfx2_init_bulk_transfer(cusbfx2_handle *h, const gchar *name, gboolean is_interrupt,
+						   guint8 endpoint, gint length, gint nqueues,
 						   cusbfx2_transfer_cb_fn callback, gpointer user_data)
 {
 	gint i;
@@ -385,8 +387,13 @@ cusbfx2_init_bulk_transfer(cusbfx2_handle *h, const gchar *name, guint8 endpoint
 		transfer->usb_transfers = g_slist_append(transfer->usb_transfers, usb_transfer);
 
 		buffer = g_malloc(length);
-		libusb_fill_bulk_transfer(usb_transfer, h->usb_handle, endpoint, buffer, length,
-								  cusbfx2_transfer_callback, transfer, CUSBFX2_TRANSFER_TIMEOUT);
+		if (is_interrupt) {
+			libusb_fill_interrupt_transfer(usb_transfer, h->usb_handle, endpoint, buffer, length,
+										   cusbfx2_transfer_callback, transfer, CUSBFX2_TRANSFER_TIMEOUT);
+		} else {
+			libusb_fill_bulk_transfer(usb_transfer, h->usb_handle, endpoint, buffer, length,
+									  cusbfx2_transfer_callback, transfer, CUSBFX2_TRANSFER_TIMEOUT);
+		}
 #if 0
 		r = libusb_submit_transfer(usb_transfer);
 		if (r) {
