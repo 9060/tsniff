@@ -226,6 +226,7 @@ cusbfx2_open(guint8 id, guint8 *firmware, const gchar *firmware_id, gboolean is_
 			g_message("[cusbfx2_open] required firmware <%s> is already loaded", manufacturer);
 			g_free(manufacturer);
 		} else {
+			g_message("[cusbfx2_open] loaded firmware is <%s>", manufacturer);
 			g_free(manufacturer);
 			if (is_force_load) g_message("[cusbfx2_open] force reload firmware");
 			g_message("[cusbfx2_open] loading firmware <%s>", firmware_id);

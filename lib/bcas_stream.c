@@ -226,6 +226,7 @@ bcas_stream_push(BCASStream *self, guint8 *data, uint len, BCASStreamCallbackFun
 			guint32 command = 0x90340000;
 			guint8 data_len;
 			guint8 data[data_len];
+			guint8 unknown;
 		}
 		guint8 checksum;	# XOR-ed packet bytes
 	};

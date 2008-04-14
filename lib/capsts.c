@@ -9,7 +9,7 @@
 /* CUSBFX2のCAPSTSファームウェア */
 static guint8 st_firmware[] =
 #include "fw.inc"
-#define FIRMWARE_ID "FX2_FIFO_ATTY20080408"
+#define FIRMWARE_ID "FX2_FIFO_ATTY20080414"
 
 static GByteArray *st_cmd_queue = NULL; /* CAPSTSファームウェアコマンドの送信キュー */
 
@@ -77,7 +77,6 @@ capsts_cmd_push(guint8 cmd, ...)
 
     case CMD_REG_WRITE:			/* 2 arguments */
     case CMD_IR_CODE:
-    case CMD_EP4AUTOINLEN:
 		arg = va_arg(ap, gint);
 		g_byte_array_append(st_cmd_queue, &arg, 1);
 		g_string_append_printf(debug_message,  " %02x", arg);
