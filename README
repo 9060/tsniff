@@ -59,6 +59,11 @@ INSTALL
    $ ./waf
    $ sudo ./waf install
 
+MacOSX でのビルド
+-----------------
+
+ $ sudo port install glib2
+
 
 OPTIONS
 =======
