@@ -21,11 +21,13 @@ ABOUT
 INSTALL
 =======
 
- python 2.3
- libusb 1.0
- libpcsclite
- glib 2.0
- sdcc
+必要なもの
+----------
+
+* python 2.3
+* glib 2.14
+* libusb 1.0
+* libpcsclite
 
 1. tsniff を入手します::
 
@@ -35,11 +37,11 @@ INSTALL
 
    $ sudo aptitude install libglib2.0-dev libpcsclite-dev
 
-3. libusb-1.0 を入手し、パッチを当て、インストールします::
+3. libusb-1.0 を入手し、インストールします::
 
    $ git clone git://projects.reactivated.net/~dsd/libusb.git libusb-1.0
    $ cd libusb-1.0
-   $ patch -p1 <../tsniff/extra/libusb.patch
+   $ git checkout 885c2a5de69d6b7d8902bb55d6d83680a5a1a6e5
    $ ./autogen.sh
    $ ./configure
    $ make
@@ -306,7 +308,7 @@ tsniff.conf::
 * HP ProLiant ML115 (Athlon 64 3200+ / 512MB)
 * Ubuntu Linux 7.10 (i386)
 * YAGI DTC110
-* libusb: d9b2ce2894ed43d34de6850f2dac50ccabf1db55
+* libusb: 885c2a5de69d6b7d8902bb55d6d83680a5a1a6e5
 * arib_std_b25-atty: 1d4752d3156f
 
 
