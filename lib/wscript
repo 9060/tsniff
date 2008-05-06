@@ -3,9 +3,18 @@
 
 def build(bld):
     lib = bld.create_obj('cc', 'staticlib')
-    lib.find_sources_in_dirs('.')
+    lib.source = """
+        bcas_stream.c
+        pseudo_bcas.c
+    """
     lib.includes = '../extra/b25/src'
     lib.name = 'capsts_staticlib'
     lib.target = 'capsts'
     lib.uselib_local = 'aribstdb25_staticlib'
-    lib.uselib = 'GLIB LIBPCSCLITE LIBUSB'
+    lib.uselib = 'GLIB LIBPCSCLITE'
+    if bld.env()['HAVE_LIBUSB']:
+        lib.source += """
+            capsts.c
+            cusbfx2.c
+        """
+        lib.uselib += ' LIBUSB'

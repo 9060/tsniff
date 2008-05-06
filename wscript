@@ -7,7 +7,7 @@ srcdir = '.'
 blddir = 'build'
 
 def set_options(opt):
-    opt.add_option('--disable-cusbfx2', action='store_false', default=True, help='Disable CUSBFX2 support', dest='cusbfx2')
+    opt.add_option('--without-libusb', action='store_false', default=True, help='Without libusb', dest='libusb')
     opt.tool_options('compiler_cc')
     opt.sub_options('extra/b25')
 
@@ -15,8 +15,12 @@ def configure(conf):
     conf.check_tool('compiler_cc')
 
     conf.check_pkg('glib-2.0', destvar='GLIB', mandatory=True)
-    if Params.g_options.cusbfx2:
-        conf.check_pkg('libusb-1.0', destvar='LIBUSB', mandatory=True)
+
+    if Params.g_options.libusb:
+        if not conf.check_pkg('libusb-1.0', destvar='LIBUSB', mandatory=False):
+            conf.env['HAVE_LIBUSB'] = False
+    else:
+        conf.env['HAVE_LIBUSB'] = False
 
     conf.sub_config('extra/b25')
 #     conf.sub_config('lib/firmware/lib')

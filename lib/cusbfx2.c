@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <stdio.h>
 #include <string.h>
 #define G_LOG_DOMAIN "cusbfx2"
