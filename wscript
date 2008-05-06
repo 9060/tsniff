@@ -9,6 +9,7 @@ blddir = 'build'
 def set_options(opt):
     opt.add_option('--disable-cusbfx2', action='store_false', default=True, help='Disable CUSBFX2 support', dest='cusbfx2')
     opt.tool_options('compiler_cc')
+    opt.sub_options('extra/b25')
 
 def configure(conf):
     conf.check_tool('compiler_cc')
