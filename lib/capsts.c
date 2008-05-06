@@ -288,4 +288,6 @@ capsts_adjust_tuner_channel(cusbfx2_handle *device, CapStsTunerSource source, co
 		g_usleep(2500 * 1000);
 		g_debug("[capsts_adjust_tuner_channel] tuner channel was adjusted");
 	}
+
+	return TRUE;
 }

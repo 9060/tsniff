@@ -35,7 +35,7 @@ typedef struct Context {
 
 
 static guint8 *
-hexparse(const guint8 *hexdump, guint len)
+hexparse(const gchar *hexdump, guint len)
 {
 	guint8 *data;
 	guint i;
@@ -186,7 +186,7 @@ release_b_cas_card(void *bcas)
 
 	bcas_stream_free(self->stream);
 
-	while (ecm = g_queue_pop_head(self->ecm_queue)) {
+	while ((ecm = g_queue_pop_head(self->ecm_queue))) {
 		g_slice_free(ECMPacket, ecm);
 	}
 	g_queue_free(self->ecm_queue);
@@ -221,7 +221,6 @@ static int get_id_b_cas_card(void *bcas, B_CAS_ID *dst)
 static int proc_ecm_b_cas_card(void *bcas, B_CAS_ECM_RESULT *dst, uint8_t *src, int len)
 {
 	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
-	gpointer data;
 	ECMPacket src_packet;
 	GList *match;
 	ECMPacket *ecm = NULL;
@@ -285,7 +284,6 @@ set_init_status(void *bcas, const guint8 *system_key, const guint8 *init_cbc)
 static gboolean
 set_init_status_from_hex(void *bcas, const gchar *system_key, const gchar *init_cbc)
 {
-	Context *self = (Context *)((B_CAS_CARD *)bcas)->private_data;
 	guint8 *syskey, *initcbc;
 	gboolean result;
 

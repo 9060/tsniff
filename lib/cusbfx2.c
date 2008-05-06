@@ -34,7 +34,8 @@ static gchar *
 cusbfx2_get_manufacturer(libusb_device_handle *handle)
 {
 	string_descriptor *desc;
-	guint8 buf[256], result[256];
+	guint8 buf[256];
+	gchar result[256];
 	gint i;
 	const struct libusb_device_descriptor *device = libusb_get_device_descriptor(libusb_get_device(handle));
 	libusb_control_transfer(handle, LIBUSB_RECIPIENT_DEVICE|LIBUSB_REQUEST_TYPE_STANDARD|LIBUSB_ENDPOINT_IN,
@@ -176,6 +177,7 @@ cusbfx2_init(void)
 	gint r;
 	r = libusb_init();
 	g_debug("[cusbfx2_init] libusb_init (%d)", r);
+	return r;
 }
 
 
@@ -376,7 +378,6 @@ cusbfx2_init_bulk_transfer(cusbfx2_handle *h, const gchar *name, gboolean is_int
 	for (i = 0; i < nqueues; ++i) {
 		struct libusb_transfer *usb_transfer;
 		gpointer buffer;
-		gint r;
 
 		usb_transfer = libusb_alloc_transfer(0);
 		if (!usb_transfer) {

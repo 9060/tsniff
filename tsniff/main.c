@@ -53,11 +53,10 @@ static GOptionEntry st_ir_options[] = {
 	{ NULL }
 };
 
-static gboolean st_b25_is_enabled = FALSE;
 static gint st_b25_round = 4;
 static gboolean st_b25_strip = FALSE;
 static gdouble st_b25_ts_delay = 0.5;
-static gint st_b25_ts_delay_string = NULL;
+static gchar *st_b25_ts_delay_string = NULL;
 static gint st_b25_bcas_queue_size = 256;
 static gchar *st_b25_system_key = NULL;
 static gchar *st_b25_init_cbc = NULL;
@@ -195,7 +194,7 @@ proc_b25(gpointer data, gsize length)
 	} else if (buffer.size > 0) {
 		GError *error = NULL;
 		gsize written;
-		g_io_channel_write_chars(st_b25_output_io, buffer.data, buffer.size, &written, &error);
+		g_io_channel_write_chars(st_b25_output_io, (gchar *)buffer.data, buffer.size, &written, &error);
 		if (error) {
 			g_warning("[transfer_ts_callback] %s", error->message);
 			g_clear_error(&error);
@@ -245,7 +244,7 @@ transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 				st_b25_queue_size += length;
 			}
 
-			while (chunk = g_queue_peek_head(st_b25_queue)) {
+			while ((chunk = g_queue_peek_head(st_b25_queue))) {
 				gdouble diff;
 
 				diff = now.tv_sec - chunk->arrived_time.tv_sec
@@ -423,7 +422,6 @@ run(void)
 	cusbfx2_handle *device = NULL;
 	cusbfx2_transfer *transfer_ts = NULL;
 	cusbfx2_transfer *transfer_bcas = NULL;
-	GError *error = NULL;
 	GTimer *timer; 
 	gboolean is_cusbfx2_inited = FALSE;
 	gboolean is_cusbfx2_started = FALSE;
@@ -527,7 +525,7 @@ run(void)
 	if (st_bcas_input_io) {
 		for (;;) {
 			GError *error = NULL;
-			guint8 buf[512];
+			gchar buf[512];
 			gsize readed;
 
 			if (g_io_channel_read_chars(st_bcas_input_io, buf, 512, &readed, &error) != G_IO_STATUS_NORMAL) {
@@ -548,7 +546,7 @@ run(void)
 			}
 
 			if (st_bcas)
-				((PSEUDO_B_CAS_CARD *)st_bcas)->push(st_bcas, buf, readed);
+				((PSEUDO_B_CAS_CARD *)st_bcas)->push(st_bcas, (guint8 *)buf, readed);
 		}
 	}
 
@@ -561,13 +559,13 @@ run(void)
 
 		if (st_ts_input_io) {
 			GError *error = NULL;
-			guint8 buf[512];
+			gchar buf[512];
 			gsize readed;
 			GIOStatus status;
 
 			status = g_io_channel_read_chars(st_ts_input_io, buf, 512, &readed, &error);
 			if (status == G_IO_STATUS_NORMAL) {
-				transfer_ts_cb(buf, 512, NULL);
+				transfer_ts_cb((guint8 *)buf, 512, NULL);
 			} else {
 				if (error) {
 					g_warning("!!! %s", error->message);
@@ -603,14 +601,14 @@ run(void)
 									   (gdouble)st_b25_queue_size / (1024 * 1024),
 									   (gsize)((gdouble)st_b25_queue_size / MAX_B25_QUEUE_SIZE * 100));
 			}
-			g_fprintf(stderr, "%s\r", infoline->str);
+			fprintf(stderr, "%s\r", infoline->str);
 
 			if (st_length > 0 && elapsed > st_length) {
 				break;
 			}
 		}
 	}
-	g_fprintf(stderr, "\n");
+	fprintf(stderr, "\n");
 	if (infoline) g_string_free(infoline, TRUE);
 	g_timer_destroy(timer);
 
@@ -680,7 +678,7 @@ run(void)
 			B25Chunk *chunk;
 
 			g_message("*** flush TS time-shift buffer");
-			while (chunk = g_queue_pop_head(st_b25_queue)) {
+			while ((chunk = g_queue_pop_head(st_b25_queue))) {
 				proc_b25(chunk + 1, chunk->size);
 
 				st_b25_queue_size -= chunk->size;
@@ -701,7 +699,7 @@ run(void)
 		} else if (buffer.size > 0) {
 			GError *error = NULL;
 			gsize written;
-			g_io_channel_write_chars(st_b25_output_io, buffer.data, buffer.size, &written, &error);
+			g_io_channel_write_chars(st_b25_output_io, (gchar *)buffer.data, buffer.size, &written, &error);
 			if (error) {
 				g_warning("!!! %s", error->message);
 				g_clear_error(&error);
@@ -759,14 +757,14 @@ dump_bcas_init_status()
 		goto quit;
 	}
 
-	g_fprintf(stdout, "[b25]\n");
+	fprintf(stdout, "[b25]\n");
 
 	hex = hexdump(init.system_key, 32, FALSE);
-	g_fprintf(stdout, "system_key = %s\n", hex->str);
+	fprintf(stdout, "system_key = %s\n", hex->str);
 	g_string_free(hex, TRUE);
 
 	hex = hexdump(init.init_cbc, 8, FALSE);
-	g_fprintf(stdout, "init_cbc = %s\n", hex->str);
+	fprintf(stdout, "init_cbc = %s\n", hex->str);
 	g_string_free(hex, TRUE);
 
  quit:
@@ -927,12 +925,7 @@ log_handler(const gchar *log_domain, GLogLevelFlags log_level, const gchar *mess
 	
 	strftime(asctime, sizeof(asctime), "%Y-%m-%d %H:%M:%S", &now_tm);
 
-	g_fprintf(stderr, "%s,%03d %s %s\n", asctime, now.tv_usec / 1000, level, message);
-}
-
-static void
-log_handler_null(const gchar *log_domain, GLogLevelFlags log_level, const gchar *message, gpointer user_data)
-{
+	fprintf(stderr, "%s,%03ld %s %s\n", asctime, now.tv_usec / 1000, level, message);
 }
 
 int
