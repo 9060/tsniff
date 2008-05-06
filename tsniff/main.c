@@ -575,7 +575,7 @@ run(void)
 			}
 		} else if (is_cusbfx2_started) {
 			PseudoBCASStatus bcas_status;
-			if (st_bcas_input_type == INPUT_TYPE_FX2 || st_bcas_input_type == INPUT_TYPE_FILE) {
+			if (st_bcas && (st_bcas_input_type == INPUT_TYPE_FX2 || st_bcas_input_type == INPUT_TYPE_FILE)) {
 				((PSEUDO_B_CAS_CARD *)st_bcas)->get_status(st_bcas, &bcas_status);
 			}
 
@@ -591,7 +591,7 @@ run(void)
 			}
 
 			g_string_printf(infoline, ">>> [Now] %.1f", elapsed);
-			if (st_bcas_input_type == INPUT_TYPE_FX2 || st_bcas_input_type == INPUT_TYPE_FILE) {
+			if (st_bcas && (st_bcas_input_type == INPUT_TYPE_FX2 || st_bcas_input_type == INPUT_TYPE_FILE)) {
 				g_string_append_printf(infoline, " [ECM] fail:%d", bcas_status.n_ecm_failure);
 			}
 			if (st_b25_queue) {
@@ -659,8 +659,8 @@ run(void)
 		}
 
 		if (st_is_intterupted) {
-			if (transfer_ts) cusbfx2_cancel_transfer_sync(transfer_ts);
-			if (transfer_bcas) cusbfx2_cancel_transfer_sync(transfer_bcas);
+			if (transfer_ts) cusbfx2_cancel_transfer(transfer_ts);
+			if (transfer_bcas) cusbfx2_cancel_transfer(transfer_bcas);
 		}
 		if (transfer_ts) cusbfx2_free_transfer(transfer_ts);
 		if (transfer_bcas) cusbfx2_free_transfer(transfer_bcas);

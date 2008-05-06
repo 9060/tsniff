@@ -429,20 +429,7 @@ cusbfx2_cancel_transfer(cusbfx2_transfer *transfer)
 		struct libusb_transfer *usb_transfer = (struct libusb_transfer *)p->data;
 		gint r = libusb_cancel_transfer(usb_transfer);
 		if (r) {
-			g_warning("[cusbfx2_cancel_transfer_sync] %s: libusb_cancel_transfer_sync failed (%d)", transfer->name, r);
-		}
-	}
-}
-
-void
-cusbfx2_cancel_transfer_sync(cusbfx2_transfer *transfer)
-{
-	GSList *p;
-	for (p = transfer->usb_transfers; p; p = g_slist_next(p)) {
-		struct libusb_transfer *usb_transfer = (struct libusb_transfer *)p->data;
-		gint r = libusb_cancel_transfer_sync(usb_transfer);
-		if (r) {
-			g_warning("[cusbfx2_cancel_transfer_sync] %s: libusb_cancel_transfer_sync failed (%d)", transfer->name, r);
+			g_warning("[cusbfx2_cancel_transfer] %s: libusb_cancel_transfer failed (%d)", transfer->name, r);
 		}
 	}
 }
@@ -457,9 +444,9 @@ cusbfx2_free_transfer(cusbfx2_transfer *transfer)
 
 	for (p = transfer->usb_transfers; p; p = g_slist_next(p)) {
 		struct libusb_transfer *usb_transfer = (struct libusb_transfer *)p->data;
-		gint r = libusb_cancel_transfer_sync(usb_transfer);
+		gint r = libusb_cancel_transfer(usb_transfer);
 		if (r) {
-			g_warning("[cusbfx2_cancel_transfer_sync] %s: libusb_cancel_transfer_sync failed (%d)", transfer->name, r);
+			g_warning("[cusbfx2_cancel_transfer] %s: libusb_cancel_transfer failed (%d)", transfer->name, r);
 		}
 		g_free(usb_transfer->buffer);
 		libusb_free_transfer(usb_transfer);
