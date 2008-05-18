@@ -3,6 +3,7 @@
 #include <time.h>
 #include <signal.h>
 #include <glib.h>
+#include "config.h"
 #include "cusbfx2.h"
 #include "capsts.h"
 #include "arib_std_b25.h"
@@ -325,9 +326,14 @@ init_b25(void)
 
 	/* B-CAS カードクラスの初期化 */
 	if (st_bcas_input_type == INPUT_TYPE_PCSC) {
+#ifdef HAVE_LIBPCSCLITE
 		g_message("*** using real B-CAS card reader");
 		st_bcas = create_b_cas_card();
 		is_pseudo_bcas = FALSE;
+#else
+		g_critical("!!! not build with libpcsclite");
+		return FALSE;
+#endif
 	} else {
 		st_bcas = (B_CAS_CARD *)pseudo_bcas_new();
 
@@ -884,6 +890,17 @@ parse_options(int *argc, char ***argv)
 
 	if (st_ts_input_type == INPUT_TYPE_FX2 || st_bcas_input_type == INPUT_TYPE_FX2) {
 		st_is_use_cusbfx2 = TRUE;
+	}
+
+#ifndef HAVE_LIBUSB
+	if (st_is_use_cusbfx2) {
+		g_critical("!!! not build with libusb");
+		return FALSE;
+	}
+#endif
+
+	if (!st_ts_output && !st_bcas_output && !st_b25_output) {
+		return FALSE;
 	}
 
 	return TRUE;

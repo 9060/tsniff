@@ -16,6 +16,7 @@ def configure(conf):
 
     conf.check_pkg('glib-2.0', destvar='GLIB', mandatory=True)
 
+    # libusb
     if Params.g_options.libusb:
         if not conf.check_pkg('libusb-1.0', destvar='LIBUSB', mandatory=False):
             conf.env['HAVE_LIBUSB'] = False
