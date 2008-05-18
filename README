@@ -62,7 +62,10 @@ INSTALL
 MacOSX でのビルド
 -----------------
 
- $ sudo port install glib2
+MacPorts 等を利用して glib2 をインストールしてください。
+
+libusb-1.0 と libpcsclite に依存する機能は利用できないため、
+保存済みの生 TS と B-CAS データに B25 デコードを掛けるぐらいしかできません。
 
 
 OPTIONS
@@ -314,7 +317,7 @@ tsniff.conf::
 * Ubuntu Linux 7.10 (i386)
 * YAGI DTC110
 * libusb: 885c2a5de69d6b7d8902bb55d6d83680a5a1a6e5
-* arib_std_b25-atty: 1d4752d3156f
+* arib_std_b25-atty: 950a18bfa838
 
 
 RESOURCES
@@ -336,8 +339,8 @@ TODO
 ====
 
 * 終了ステータス (エラーの有無)
-* ポータビリティの向上(\*BSD, MacOSX, ... Windows はしらね) 
+* ポータビリティの向上(libusb-1.0 任せ) 
 * VLC の input module にする
 * mplayer の input module にする
-* Friio対応(実機がない)
+* Friio対応(そのうち実機購入予定)
 * TSの処理
