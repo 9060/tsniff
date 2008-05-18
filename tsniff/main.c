@@ -478,6 +478,7 @@ run(void)
 
 	/* Initialize CUSBFX2 */
 	if (st_is_use_cusbfx2) {
+#ifdef HAVE_LIBUSB
 		cusbfx2_init();
 		is_cusbfx2_inited = TRUE;
 
@@ -523,6 +524,7 @@ run(void)
 
 		if (transfer_ts) cusbfx2_start_transfer(transfer_ts);
 		if (transfer_bcas) cusbfx2_start_transfer(transfer_bcas);
+#endif
 	}
 
 	install_sighandler();
@@ -580,6 +582,7 @@ run(void)
 				break;
 			}
 		} else if (is_cusbfx2_started) {
+#ifdef HAVE_LIBUSB
 			PseudoBCASStatus bcas_status;
 			if (st_bcas && (st_bcas_input_type == INPUT_TYPE_FX2 || st_bcas_input_type == INPUT_TYPE_FILE)) {
 				((PSEUDO_B_CAS_CARD *)st_bcas)->get_status(st_bcas, &bcas_status);
@@ -612,6 +615,7 @@ run(void)
 			if (st_length > 0 && elapsed > st_length) {
 				break;
 			}
+#endif
 		}
 	}
 	fprintf(stderr, "\n");
@@ -626,6 +630,7 @@ run(void)
 
 	/* TS転送を止め、対応するであろう鍵を受け取るまで待つ */
 	if (st_b25_queue && st_bcas_input_type == INPUT_TYPE_FX2 && ts_disposed_time > .0) {
+#ifdef HAVE_LIBUSB
 		g_message("*** waiting for last ECM");
 		if (transfer_ts) {
 			capsts_cmd_push(CMD_EP6IN_STOP);
@@ -649,6 +654,7 @@ run(void)
 			cusbfx2_free_transfer(transfer_bcas);
 			transfer_bcas = NULL;
 		}
+#endif
 	}
 
  quit:
@@ -656,6 +662,7 @@ run(void)
 	restore_sighandler();
 
 	if (st_is_use_cusbfx2) {
+#ifdef HAVE_LIBUSB
 		if (is_cusbfx2_started) {
 			g_message("*** set CUSBFX2 to idle mode");
 			if (transfer_ts) capsts_cmd_push(CMD_EP6IN_STOP);
@@ -673,6 +680,7 @@ run(void)
 
 		if (device) cusbfx2_close(device);
 		if (is_cusbfx2_inited) cusbfx2_exit();
+#endif
 	}
 
 	/* flush */
@@ -745,11 +753,13 @@ dump_bcas_init_status()
 	B_CAS_INIT_STATUS init;
 	GString *hex;
 
+#ifdef HAVE_LIBPCSCLITE
 	st_bcas = create_b_cas_card();
 	if (!st_bcas) {
 		g_critical("!!! couldn't create B-CAS card reader");
 		goto quit;
 	}
+#endif
 
 	r = st_bcas->init(st_bcas);
 	if (r < 0) {
