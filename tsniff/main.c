@@ -909,7 +909,7 @@ parse_options(int *argc, char ***argv)
 	}
 #endif
 
-	if (!st_ts_output && !st_bcas_output && !st_b25_output) {
+	if (!st_ts_output && !st_bcas_output && !st_b25_output && !st_dump_bcas_init_status) {
 		return FALSE;
 	}
 
