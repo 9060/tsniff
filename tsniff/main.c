@@ -36,7 +36,7 @@ static GOptionEntry st_fx2_options[] = {
 	  "Force load the firmware [disabled]", NULL },
 	{ "fx2-ts-buffer-size", 0, 0, G_OPTION_ARG_INT, &st_fx2_ts_buffer_size,
 	  "Set TS transfer buffer size to N bytes [16384]", "N" },
-	{ "fx2-ts-buffer-count", 0, 0, G_OPTION_ARG_INT, &st_fx2_ts_buffer_size,
+	{ "fx2-ts-buffer-count", 0, 0, G_OPTION_ARG_INT, &st_fx2_ts_buffer_count,
 	  "Set TS transfer buffer count to N [16]", "N" },
 	{ NULL }
 };
@@ -610,7 +610,7 @@ run(void)
 									   (gdouble)st_b25_queue_size / (1024 * 1024),
 									   (gsize)((gdouble)st_b25_queue_size / MAX_B25_QUEUE_SIZE * 100));
 			}
-			fprintf(stderr, "%s\r", infoline->str);
+			if (!st_is_quiet) fprintf(stderr, "%s\r", infoline->str);
 
 			if (st_length > 0 && elapsed > st_length) {
 				break;
@@ -654,6 +654,7 @@ run(void)
 			cusbfx2_free_transfer(transfer_bcas);
 			transfer_bcas = NULL;
 		}
+		g_message("*** waiting for last ECM");
 #endif
 	}
 
@@ -936,7 +937,7 @@ log_handler(const gchar *log_domain, GLogLevelFlags log_level, const gchar *mess
 		break;
 	case G_LOG_LEVEL_MESSAGE:
 	case G_LOG_LEVEL_INFO:
-		if (st_is_quiet) return;
+/* 		if (st_is_quiet) return; */
 		level = "INFO ";
 		break;
 	case G_LOG_LEVEL_DEBUG:

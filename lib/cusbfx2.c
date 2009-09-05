@@ -39,10 +39,11 @@ cusbfx2_get_manufacturer(libusb_device_handle *handle)
 	guint8 buf[256];
 	gchar result[256];
 	gint i;
-	const struct libusb_device_descriptor *device = libusb_get_device_descriptor(libusb_get_device(handle));
+	struct libusb_device_descriptor device;
+	libusb_get_device_descriptor(libusb_get_device(handle), &device);
 	libusb_control_transfer(handle, LIBUSB_RECIPIENT_DEVICE|LIBUSB_REQUEST_TYPE_STANDARD|LIBUSB_ENDPOINT_IN,
 							LIBUSB_REQUEST_GET_DESCRIPTOR,
-							(LIBUSB_DT_STRING << 8) | device->iManufacturer,
+							(LIBUSB_DT_STRING << 8) | device.iManufacturer,
 							0x0000, buf, sizeof(buf) - 1, 1000);
 	desc = (string_descriptor *)buf;
 
@@ -67,7 +68,7 @@ cusbfx2_find_open(guint8 id)
 	gint ndevices;
 	gint i = 0;
 
-	ndevices = libusb_get_device_list(&devices);
+	ndevices = libusb_get_device_list(NULL, &devices);
 	if (ndevices < 0) {
 		g_warning("[cusbfx2_find_open] no devices found (%d)", ndevices);
 		return NULL;
@@ -75,18 +76,19 @@ cusbfx2_find_open(guint8 id)
 
 	/* 接続されている全てのUSBデバイスを調べる */
 	while ((device = devices[i++])) {
-		const struct libusb_device_descriptor *desc = libusb_get_device_descriptor(device);
+		struct libusb_device_descriptor desc;
+		libusb_get_device_descriptor(device, &desc);
 
 /* 		g_debug("[cusbfx2_find_open] %d:idVendor=0x%04x, idProduct=0x%04x, bcdDevice=0x%04x", */
-/* 				i - 1, desc->idVendor, desc->idProduct, desc->bcdDevice); */
+/* 				i - 1, desc.idVendor, desc.idProduct, desc.bcdDevice); */
 
 		/* bcdDevice = FX2LP:0xA0nn FX2:0x00nn */
-		if (((id == 0) && ((desc->bcdDevice & 0x0F00) == 0x0000)) ||
-			(desc->bcdDevice == 0xFF00 + id)) {
-			if ((desc->idVendor == 0x04B4) &&
-				((desc->idProduct == 0x8613) || (desc->idProduct == 0x1004))) {
+		if (((id == 0) && ((desc.bcdDevice & 0x0F00) == 0x0000)) ||
+			(desc.bcdDevice == 0xFF00 + id)) {
+			if ((desc.idVendor == 0x04B4) &&
+				((desc.idProduct == 0x8613) || (desc.idProduct == 0x1004))) {
 				g_message("[cusbfx2_find_open] cusbfx2 found (idVendor=%04x, idProduct=%04x, bcdDevice=%04x)",
-						  desc->idVendor, desc->idProduct, desc->bcdDevice);
+						  desc.idVendor, desc.idProduct, desc.bcdDevice);
 				found = device;
 				break;
 			}
@@ -95,8 +97,7 @@ cusbfx2_find_open(guint8 id)
 
 	/* デバイスをオープンする */
 	if (found) {
-		handle = libusb_open(found);
-		if (!handle) {
+		if (!libusb_open(found, &handle)) {
 			g_critical("[cusbfx2_find_open] libusb_open failed");
 		} else {
 			gint r = libusb_claim_interface(handle, 0);
@@ -177,7 +178,7 @@ gint
 cusbfx2_init(void)
 {
 	gint r;
-	r = libusb_init();
+	r = libusb_init(NULL);
 	g_debug("[cusbfx2_init] libusb_init (%d)", r);
 	return r;
 }
@@ -191,7 +192,7 @@ cusbfx2_init(void)
 void
 cusbfx2_exit(void)
 {
-	libusb_exit();
+	libusb_exit(NULL);
 	g_debug("[cusbfx2_exit] libusb_exit");
 }
 
@@ -335,6 +336,18 @@ cusbfx2_transfer_callback(struct libusb_transfer *usb_transfer)
 		g_warning("[cusbfx2_transfer_callback] %s: canceled", transfer->name);
 		break;
 
+	case LIBUSB_TRANSFER_STALL:
+		g_warning("[cusbfx2_transfer_callback] %s: stalled", transfer->name);
+		break;
+
+	case LIBUSB_TRANSFER_NO_DEVICE:
+		g_warning("[cusbfx2_transfer_callback] %s: device was disconnected", transfer->name);
+		break;
+
+	case LIBUSB_TRANSFER_OVERFLOW:
+		g_warning("[cusbfx2_transfer_callback] %s: device sent more data than requested", transfer->name);
+		break;
+
 	default:
 		g_assert_not_reached();
 	}
@@ -471,5 +484,5 @@ cusbfx2_free_transfer(cusbfx2_transfer *transfer)
 int
 cusbfx2_poll(void)
 {
-	return libusb_handle_events();
+	return libusb_handle_events(NULL);
 }
