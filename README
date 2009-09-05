@@ -24,9 +24,9 @@ INSTALL
 必要なもの
 ----------
 
-* python 2.3
+* python >= 2.3
 * glib 2.14
-* libusb 1.0
+* libusb-1.0 >= 1.0.0
 * libpcsclite
 
 1. tsniff を入手します::
@@ -39,6 +39,7 @@ INSTALL
 
 3. libusb-1.0 を入手し、インストールします::
 
+   $ http://www.libusb.org/wiki/Libusb1.0
    $ git clone git://projects.reactivated.net/~dsd/libusb.git libusb-1.0
    $ cd libusb-1.0
    $ git checkout 885c2a5de69d6b7d8902bb55d6d83680a5a1a6e5
@@ -73,14 +74,14 @@ SETUP
 
 Ubuntu 7.10 の場合
 
-/etc/udev/rules.d/49-recfx2.rules
-# Friio (White)
-SUBSYSTEM=="usb_device", ATTRS{idVendor}=="7a69", ATTRS{idProduct}=="0001", GROUP="video"
+/etc/udev/rules.d/49-recfx2.rules::
 
-# Chameleon USB FX2
-SUBSYSTEM=="usb_device", ATTRS{idVendor}=="04b4", ATTRS{idProduct}=="8613", GROUP="video"
-SUBSYSTEM=="usb_device", ATTRS{idVendor}=="04b4", ATTRS{idProduct}=="1004", GROUP="video"
+  # Friio (White)
+  SUBSYSTEM=="usb", ATTRS{idVendor}=="7a69", ATTRS{idProduct}=="0001", GROUP="video"
 
+  # Chameleon USB FX2
+  SUBSYSTEM=="usb_device", ATTRS{idVendor}=="04b4", ATTRS{idProduct}=="8613", GROUP="video"
+  SUBSYSTEM=="usb_device", ATTRS{idVendor}=="04b4", ATTRS{idProduct}=="1004", GROUP="video"
 
 
 OPTIONS
@@ -328,10 +329,10 @@ tsniff.conf::
 動作確認環境
 ------------
 
-* HP ProLiant ML115 (Athlon 64 3200+ / 512MB)
-* Ubuntu Linux 7.10 (i386)
+* HP ProLiant ML115 G5 (Athlon 1640B 2.7GHz / !GB)
+* Ubuntu Linux 8.10 interpid (amd64)
 * YAGI DTC110
-* libusb: 885c2a5de69d6b7d8902bb55d6d83680a5a1a6e5
+* libusb: 1.0.3
 * arib_std_b25-atty: 950a18bfa838
 
 
@@ -339,7 +340,7 @@ RESOURCES
 =========
 
 * http://d.hatena.ne.jp/atty/
-* http://atty.skr.jp/hg/tsniff/
+* http://bitcucket.org/atty303/tsniff/
 * http://atty.skr.jp/hg/arib_std_b25-atty/
 * http://atty.skr.jp/hg/cap_sts-atty/
 
@@ -357,5 +358,5 @@ TODO
 * ポータビリティの向上(libusb-1.0 任せ) 
 * VLC の input module にする
 * mplayer の input module にする
-* Friio対応(そのうち実機購入予定)
+* Friio対応
 * TSの処理
