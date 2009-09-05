@@ -174,8 +174,12 @@ restore_sighandler(void)
 }
 
 
-/* Callbacks
+/* Threads
    -------------------------------------------------------------------------- */
+static GThread *st_b25_thread = NULL;
+static gboolean st_is_b25_running = TRUE;
+static GAsyncQueue *st_b25_async_queue = NULL;
+
 static void
 proc_b25(gpointer data, gsize length)
 {
@@ -197,12 +201,60 @@ proc_b25(gpointer data, gsize length)
 		gsize written;
 		g_io_channel_write_chars(st_b25_output_io, (gchar *)buffer.data, buffer.size, &written, &error);
 		if (error) {
-			g_warning("[transfer_ts_callback] %s", error->message);
+			g_warning("[proc_b25] %s", error->message);
 			g_clear_error(&error);
 		}
 	}
 }
 
+static void proc_b25_chunk(B25Chunk *chunk)
+{
+	GTimeVal now;
+	gdouble diff;
+
+	g_get_current_time(&now);
+
+	diff = now.tv_sec - chunk->arrived_time.tv_sec
+		+ (((gdouble)now.tv_usec - chunk->arrived_time.tv_usec) / G_USEC_PER_SEC);
+	if (diff >= 0 && diff < st_b25_ts_delay) {
+		g_usleep(st_b25_ts_delay * G_USEC_PER_SEC);
+	}
+
+	proc_b25(chunk + 1, chunk->size);
+
+	g_slice_free1(sizeof(B25Chunk) + chunk->size, chunk);
+}
+
+static gpointer
+b25_thread(gpointer data)
+{
+	B25Chunk *chunk;
+
+	g_async_queue_ref(st_b25_async_queue);
+
+	while (st_is_b25_running) {
+		while ((chunk = g_async_queue_try_pop(st_b25_async_queue))) {
+			proc_b25_chunk(chunk);
+		}
+
+		if (!chunk) {
+			g_usleep(1000);
+			continue;
+		}
+	}
+
+	while ((chunk = g_async_queue_try_pop(st_b25_async_queue))) {
+		proc_b25_chunk(chunk);
+	}
+
+	g_async_queue_unref(st_b25_async_queue);
+
+	return NULL;
+}
+
+
+/* Callbacks
+   -------------------------------------------------------------------------- */
 static gboolean
 transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 {
@@ -218,50 +270,24 @@ transfer_ts_cb(gpointer data, gint length, gpointer user_data)
 	}
 
 	if (st_b25_output_io) {
-		if (!st_b25_queue) {
-			proc_b25(data, length);
-		} else {
-			GTimeVal now;
-			B25Chunk *chunk;
+		GTimeVal now;
+		B25Chunk *chunk;
 			
-			if (st_bcas_input_type == INPUT_TYPE_FX2) {
-				PseudoBCASStatus status;
-				((PSEUDO_B_CAS_CARD *)st_bcas)->get_status(st_bcas, &status);
-				if (status.n_ecm_arrived == 0)
-					return !st_is_intterupted;
-			}
-
-			g_get_current_time(&now);
-			
-			/* キューに積む */
-			if (st_b25_queue_size > MAX_B25_QUEUE_SIZE) {
-				g_warning("[transfer_ts_callback] !!! TS TIME-SHIFT BUFFER OVERRUN !!!");
-			} else {
-				chunk = g_slice_alloc(sizeof(B25Chunk) + length);
-				chunk->arrived_time = now;
-				chunk->size = length;
-				memcpy(chunk + 1, data, length);
-				g_queue_push_tail(st_b25_queue, chunk);
-				st_b25_queue_size += length;
-			}
-
-			while ((chunk = g_queue_peek_head(st_b25_queue))) {
-				gdouble diff;
-
-				diff = now.tv_sec - chunk->arrived_time.tv_sec
-					+ (((gdouble)now.tv_usec - chunk->arrived_time.tv_usec) / 1000000);
-				if (diff < st_b25_ts_delay) {
-					break;
-				}
-
-				chunk = g_queue_pop_head(st_b25_queue);
-
-				proc_b25(chunk + 1, chunk->size);
-
-				st_b25_queue_size -= chunk->size;
-				g_slice_free1(sizeof(B25Chunk) + chunk->size, chunk);
-			}
+		if (st_bcas_input_type == INPUT_TYPE_FX2) {
+			PseudoBCASStatus status;
+			((PSEUDO_B_CAS_CARD *)st_bcas)->get_status(st_bcas, &status);
+			if (status.n_ecm_arrived == 0)
+				return !st_is_intterupted;
 		}
+
+		g_get_current_time(&now);
+			
+		/* キューに積む */
+		chunk = g_slice_alloc(sizeof(B25Chunk) + length);
+		chunk->arrived_time = now;
+		chunk->size = length;
+		memcpy(chunk + 1, data, length);
+		g_async_queue_push(st_b25_async_queue, chunk);
 	}
 
 	return !st_is_intterupted;
@@ -323,6 +349,7 @@ init_b25(void)
 {
 	gboolean is_pseudo_bcas = TRUE;
 	gint r;
+	GError *error = NULL;
 
 	/* B-CAS カードクラスの初期化 */
 	if (st_bcas_input_type == INPUT_TYPE_PCSC) {
@@ -384,11 +411,15 @@ init_b25(void)
 
 	st_b25->set_b_cas_card(st_b25, st_bcas);
 
-	/* Initialize TS time-shift buffer */
-	if (st_bcas_input_type == INPUT_TYPE_FX2) {
-		st_b25_queue = g_queue_new();
-		g_message("*** Initalize TS time-shift buffer");
+	/* Initialize B25 threads */
+	g_thread_init(NULL);
+	st_b25_thread = g_thread_create(b25_thread, NULL, TRUE, &error);
+	if (error) {
+		g_critical("[init_b25] %s", error->message);
+		g_clear_error(&error);
+		return FALSE;
 	}
+	st_b25_async_queue = g_async_queue_new();
 
 	return TRUE;
 }
@@ -689,17 +720,10 @@ run(void)
 		gint r;
 		ARIB_STD_B25_BUFFER buffer;
 
-		if (st_b25_queue) {
-			B25Chunk *chunk;
-
-			g_message("*** flush TS time-shift buffer");
-			while ((chunk = g_queue_pop_head(st_b25_queue))) {
-				proc_b25(chunk + 1, chunk->size);
-
-				st_b25_queue_size -= chunk->size;
-				g_slice_free1(sizeof(B25Chunk) + chunk->size, chunk);
-			}
-			g_queue_free(st_b25_queue);
+		/* wait for b25 thread to finish ... */
+		if (st_b25_thread) {
+			st_is_b25_running = FALSE;
+			g_thread_join(st_b25_thread);
 		}
 
 		g_message("*** flush B25 decoder");

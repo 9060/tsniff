@@ -7,4 +7,4 @@ def build(bld):
     bin.includes = '../extra/b25/src ../lib'
     bin.target = 'tsniff'
     bin.uselib_local = 'capsts_staticlib'
-    bin.uselib = 'GLIB'
+    bin.uselib = 'GLIB GTHREAD'

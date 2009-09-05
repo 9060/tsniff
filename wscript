@@ -15,6 +15,7 @@ def configure(conf):
     conf.check_tool('compiler_cc')
 
     conf.check_pkg('glib-2.0', destvar='GLIB', mandatory=True)
+    conf.check_pkg('gthread-2.0', destvar='GTHREAD', mandatory=True)
 
     # libusb
     if Params.g_options.libusb:
